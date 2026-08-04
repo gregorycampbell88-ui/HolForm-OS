@@ -1,0 +1,14 @@
+{
+  "name": "HolForm Weekly Operating System",
+  "short_name": "HolForm OS",
+  "description": "ADHD-friendly weekly operating system for Greg Campbell / HolForm Coaching",
+  "start_url": "./index.html",
+  "scope": "./",
+  "display": "standalone",
+  "background_color": "#0e1113",
+  "theme_color": "#0e1113",
+  "orientation": "portrait",
+  "icons": [
+    { "src": "icons/icon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any maskable" }
+  ]
+}
