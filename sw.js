@@ -1,4 +1,4 @@
-const CACHE = 'holform-os-v2';
+const CACHE = 'holform-os-v3';
 const ASSETS = [
   './',
   './index.html',
