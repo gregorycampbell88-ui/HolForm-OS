@@ -395,6 +395,69 @@ main {
   line-height: 1;
 }
 
+/* tasks */
+.tasks-grid {
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+}
+@media (min-width: 640px) {
+  .tasks-grid { flex-direction: row; align-items: flex-start; }
+  .task-column { flex: 1; min-width: 0; }
+}
+
+.task-column-title {
+  font-size: 0.9rem;
+  margin: 0 0 10px;
+  color: var(--light-gray);
+}
+
+.task-list {
+  list-style: none;
+  margin: 12px 0 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.task-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  background: var(--charcoal);
+  border: 1px solid var(--charcoal-2);
+  border-radius: 8px;
+  padding: 10px 10px;
+}
+
+.drag-handle {
+  cursor: grab;
+  color: var(--mid-gray);
+  font-size: 1rem;
+  touch-action: none;
+  padding: 0 2px;
+  user-select: none;
+}
+
+.task-text {
+  flex: 1;
+  font-size: 0.88rem;
+  line-height: 1.3;
+}
+
+.task-checked {
+  opacity: 0.55;
+}
+.task-checked .task-text {
+  text-decoration: line-through;
+  color: var(--mid-gray);
+}
+
+.sortable-ghost {
+  opacity: 0.4;
+}
+
 /* dashboard */
 .reminder-banner {
   background: var(--charcoal-2);

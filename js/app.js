@@ -6,13 +6,16 @@ const STORAGE_KEY = 'holform-os-state-v1';
 
 const DEFAULT_STATE = {
   season: 'transition', // 'transition' | 'driving'
-  activeTab: 'today',   // 'today' | 'dashboard'
+  activeTab: 'today',   // 'today' | 'tasks' | 'dashboard'
   selectedDate: todayISO(),
   checks: {},        // { [dateISO]: { [blockIdx]: true } }
   finishLine: {},     // { [dateISO]: string }
   phoneMission: {},   // { [dateISO]: string }
   parkingLot: {},     // { [dateISO]: [{id,text}] }
   minimumMode: {},    // { [dateISO]: bool }
+  weeklyTasks: {},     // { [weekKey]: [{id,text,checked}] }
+  dailyTasks: {},      // { [dateISO]: [{id,text,checked}] }
+  lastRolloverDate: null,
 };
 
 let state = loadState();
@@ -59,6 +62,37 @@ function nowMinutes() {
   return d.getHours() * 60 + d.getMinutes();
 }
 
+function getWeekKey(dateISO) {
+  const d = new Date(dateISO + 'T12:00:00');
+  const day = d.getDay(); // 0=Sun..6=Sat
+  const diffToMonday = (day === 0 ? -6 : 1) - day;
+  d.setDate(d.getDate() + diffToMonday);
+  return d.toISOString().slice(0, 10);
+}
+
+// Unchecked daily tasks from any past day roll forward onto today;
+// completed tasks stay on the day they were finished.
+function rolloverDailyTasks() {
+  const today = todayISO();
+  if (state.lastRolloverDate === today) return;
+  const carried = [];
+  Object.keys(state.dailyTasks).forEach((dateKey) => {
+    if (dateKey >= today) return;
+    const list = state.dailyTasks[dateKey];
+    const unchecked = list.filter((t) => !t.checked);
+    const checked = list.filter((t) => t.checked);
+    if (unchecked.length) carried.push(...unchecked);
+    if (checked.length) state.dailyTasks[dateKey] = checked;
+    else delete state.dailyTasks[dateKey];
+  });
+  if (carried.length) {
+    const existing = state.dailyTasks[today] || [];
+    state.dailyTasks[today] = carried.concat(existing);
+  }
+  state.lastRolloverDate = today;
+  saveState();
+}
+
 // ---------- rendering ----------
 
 function el(tag, attrs = {}, children = []) {
@@ -79,11 +113,13 @@ function el(tag, attrs = {}, children = []) {
 function render() {
   renderHeader();
   if (state.activeTab === 'today') renderToday();
+  else if (state.activeTab === 'tasks') renderTasks();
   else renderDashboard();
   document.querySelectorAll('.tab-btn').forEach(b => {
     b.classList.toggle('active', b.dataset.tab === state.activeTab);
   });
   document.getElementById('view-today').classList.toggle('hidden', state.activeTab !== 'today');
+  document.getElementById('view-tasks').classList.toggle('hidden', state.activeTab !== 'tasks');
   document.getElementById('view-dashboard').classList.toggle('hidden', state.activeTab !== 'dashboard');
 }
 
@@ -335,6 +371,92 @@ function renderDashboard() {
   container.appendChild(grid);
 }
 
+// ---------- tasks ----------
+
+let weeklySortable = null;
+let dailySortable = null;
+
+function renderTasks() {
+  const container = document.getElementById('view-tasks');
+  container.innerHTML = '';
+  if (weeklySortable) { weeklySortable.destroy(); weeklySortable = null; }
+  if (dailySortable) { dailySortable.destroy(); dailySortable = null; }
+
+  const weekKey = getWeekKey(todayISO());
+  const dayKey = todayISO();
+  if (!state.weeklyTasks[weekKey]) state.weeklyTasks[weekKey] = [];
+  if (!state.dailyTasks[dayKey]) state.dailyTasks[dayKey] = [];
+
+  const weekCol = renderTaskColumn('This Week', state.weeklyTasks[weekKey]);
+  const dayCol = renderTaskColumn('Today', state.dailyTasks[dayKey]);
+
+  const grid = el('div', { class: 'tasks-grid' }, [weekCol.node, dayCol.node]);
+  container.appendChild(grid);
+
+  if (window.Sortable) {
+    weeklySortable = new Sortable(weekCol.listEl, {
+      handle: '.drag-handle', animation: 150,
+      onEnd: (evt) => reorderTasks(state.weeklyTasks[weekKey], evt.oldIndex, evt.newIndex),
+    });
+    dailySortable = new Sortable(dayCol.listEl, {
+      handle: '.drag-handle', animation: 150,
+      onEnd: (evt) => reorderTasks(state.dailyTasks[dayKey], evt.oldIndex, evt.newIndex),
+    });
+  }
+}
+
+function reorderTasks(list, oldIndex, newIndex) {
+  if (oldIndex === newIndex) return;
+  const [moved] = list.splice(oldIndex, 1);
+  list.splice(newIndex, 0, moved);
+  saveState();
+}
+
+function renderTaskColumn(title, list) {
+  const column = el('div', { class: 'task-column' }, [
+    el('h3', { class: 'task-column-title' }, title),
+  ]);
+
+  const input = el('input', { type: 'text', class: 'text-input', placeholder: 'Type a task, then Add' });
+  const addIt = () => {
+    if (!input.value.trim()) return;
+    list.push({ id: Date.now() + Math.random(), text: input.value.trim(), checked: false });
+    input.value = '';
+    saveState();
+    render();
+  };
+  input.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter' || e.keyCode === 13) { e.preventDefault(); addIt(); }
+  });
+  column.appendChild(el('div', { class: 'lot-input-row' }, [
+    input,
+    el('button', { class: 'lot-add-btn', onclick: addIt }, 'Add'),
+  ]));
+
+  const listEl = el('ul', { class: 'task-list' });
+  list.forEach((task) => {
+    listEl.appendChild(el('li', { class: 'task-row' + (task.checked ? ' task-checked' : '') }, [
+      el('span', { class: 'drag-handle' }, '⠿'),
+      el('input', {
+        type: 'checkbox', class: 'block-check',
+        ...(task.checked ? { checked: 'checked' } : {}),
+        onchange: (e) => { task.checked = e.target.checked; saveState(); render(); },
+      }),
+      el('span', { class: 'task-text' }, task.text),
+      el('button', {
+        class: 'lot-remove', onclick: () => {
+          const idx = list.indexOf(task);
+          if (idx > -1) list.splice(idx, 1);
+          saveState(); render();
+        }
+      }, '×'),
+    ]));
+  });
+  column.appendChild(listEl);
+
+  return { node: column, listEl };
+}
+
 function setTimer(minutes) {
   clearInterval(timerInterval);
   timerRunning = false;
@@ -407,13 +529,18 @@ function init() {
     Notification.requestPermission().catch(() => {});
   }
   if (window.HolformSync) window.HolformSync.init(onRemoteState);
+  rolloverDailyTasks();
   render();
-  setInterval(() => { if (state.activeTab === 'today') render(); }, 60000);
+  setInterval(() => {
+    rolloverDailyTasks();
+    if (state.activeTab === 'today' || state.activeTab === 'tasks') render();
+  }, 60000);
 }
 
 function onRemoteState(remote) {
   state = Object.assign(structuredClone(DEFAULT_STATE), remote);
   localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+  rolloverDailyTasks();
   render();
 }
 
