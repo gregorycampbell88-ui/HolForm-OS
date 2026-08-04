@@ -13,9 +13,11 @@ const DEFAULT_STATE = {
   phoneMission: {},   // { [dateISO]: string }
   parkingLot: {},     // { [dateISO]: [{id,text}] }
   minimumMode: {},    // { [dateISO]: bool }
-  weeklyTasks: {},     // { [weekKey]: [{id,text,checked}] }
-  dailyTasks: {},      // { [dateISO]: [{id,text,checked}] }
+  weeklyTasks: {},     // { [weekKey]: [{id,text,checked,carriedCount}] }
+  dailyTasks: {},      // { [dateISO]: [{id,text,checked,carriedCount}] }
   lastRolloverDate: null,
+  dayMeta: {},          // { [dateISO]: {groupKey, season} } — locks in which template a day used
+  weeklyReflections: {}, // { [weekKey]: string }
 };
 
 let state = loadState();
@@ -70,6 +72,22 @@ function getWeekKey(dateISO) {
   return d.toISOString().slice(0, 10);
 }
 
+function shiftWeekKey(weekKey, deltaWeeks) {
+  const d = new Date(weekKey + 'T12:00:00');
+  d.setDate(d.getDate() + deltaWeeks * 7);
+  return d.toISOString().slice(0, 10);
+}
+
+function getWeekDates(weekKey) {
+  const dates = [];
+  const d = new Date(weekKey + 'T12:00:00');
+  for (let i = 0; i < 7; i++) {
+    dates.push(d.toISOString().slice(0, 10));
+    d.setDate(d.getDate() + 1);
+  }
+  return dates;
+}
+
 // Unchecked daily tasks from any past day roll forward onto today;
 // completed tasks stay on the day they were finished.
 function rolloverDailyTasks() {
@@ -79,7 +97,7 @@ function rolloverDailyTasks() {
   Object.keys(state.dailyTasks).forEach((dateKey) => {
     if (dateKey >= today) return;
     const list = state.dailyTasks[dateKey];
-    const unchecked = list.filter((t) => !t.checked);
+    const unchecked = list.filter((t) => !t.checked).map((t) => ({ ...t, carriedCount: (t.carriedCount || 0) + 1 }));
     const checked = list.filter((t) => t.checked);
     if (unchecked.length) carried.push(...unchecked);
     if (checked.length) state.dailyTasks[dateKey] = checked;
@@ -114,12 +132,14 @@ function render() {
   renderHeader();
   if (state.activeTab === 'today') renderToday();
   else if (state.activeTab === 'tasks') renderTasks();
+  else if (state.activeTab === 'trends') renderTrends();
   else renderDashboard();
   document.querySelectorAll('.tab-btn').forEach(b => {
     b.classList.toggle('active', b.dataset.tab === state.activeTab);
   });
   document.getElementById('view-today').classList.toggle('hidden', state.activeTab !== 'today');
   document.getElementById('view-tasks').classList.toggle('hidden', state.activeTab !== 'tasks');
+  document.getElementById('view-trends').classList.toggle('hidden', state.activeTab !== 'trends');
   document.getElementById('view-dashboard').classList.toggle('hidden', state.activeTab !== 'dashboard');
 }
 
@@ -145,6 +165,11 @@ function renderToday() {
   const note = getDayNote(state.season, weekday);
   const isToday = state.selectedDate === todayISO();
   const checksForDay = state.checks[state.selectedDate] || {};
+
+  if (!state.dayMeta[state.selectedDate]) {
+    state.dayMeta[state.selectedDate] = { groupKey, season: state.season };
+    saveState();
+  }
   const isMinimum = !!state.minimumMode[state.selectedDate];
 
   // date nav
@@ -455,6 +480,151 @@ function renderTaskColumn(title, list) {
   column.appendChild(listEl);
 
   return { node: column, listEl };
+}
+
+// ---------- trends ----------
+
+let trendsWeekKey = null;
+
+function computeWeekStats(weekDates) {
+  const today = todayISO();
+  const days = weekDates.map((dateISO) => {
+    const weekday = new Date(dateISO + 'T12:00:00').getDay();
+    const meta = state.dayMeta[dateISO] || { season: state.season };
+    const { blocks } = getScheduleFor(meta.season, weekday);
+    const checksForDay = state.checks[dateISO] || {};
+    const total = blocks.length;
+    const checkedCount = blocks.reduce((n, b, idx) => n + (checksForDay[idx] ? 1 : 0), 0);
+    const isFuture = dateISO > today;
+    return { dateISO, total, checkedCount, isFuture, blocks, checksForDay };
+  });
+
+  const skipCounts = {};
+  const appearCounts = {};
+  days.filter((d) => !d.isFuture).forEach((d) => {
+    d.blocks.forEach((b, idx) => {
+      appearCounts[b.label] = (appearCounts[b.label] || 0) + 1;
+      if (!d.checksForDay[idx]) skipCounts[b.label] = (skipCounts[b.label] || 0) + 1;
+    });
+  });
+  const leaderboard = Object.keys(skipCounts)
+    .map((label) => ({ label, skipped: skipCounts[label], of: appearCounts[label] }))
+    .sort((a, b) => b.skipped - a.skipped)
+    .slice(0, 6);
+
+  const weekKey = getWeekKey(weekDates[0]);
+  const weeklyList = state.weeklyTasks[weekKey] || [];
+  const dailyLists = weekDates.flatMap((dateISO) => state.dailyTasks[dateISO] || []);
+  const allTasks = weeklyList.concat(dailyLists);
+  const totalTasks = allTasks.length;
+  const completedTasks = allTasks.filter((t) => t.checked).length;
+  const stuckTasks = allTasks.filter((t) => !t.checked && (t.carriedCount || 0) >= 2);
+
+  return { days, leaderboard, totalTasks, completedTasks, stuckTasks };
+}
+
+function renderTrends() {
+  const container = document.getElementById('view-trends');
+  container.innerHTML = '';
+  if (!trendsWeekKey) trendsWeekKey = getWeekKey(todayISO());
+  const weekDates = getWeekDates(trendsWeekKey);
+  const currentWeekKey = getWeekKey(todayISO());
+  const atLatest = trendsWeekKey === currentWeekKey;
+
+  container.appendChild(el('div', { class: 'date-nav' }, [
+    el('button', { class: 'nav-btn', onclick: () => { trendsWeekKey = shiftWeekKey(trendsWeekKey, -1); renderTrends(); } }, '‹ Prev Week'),
+    el('button', { class: 'nav-btn today-btn', onclick: () => { trendsWeekKey = currentWeekKey; renderTrends(); } }, 'This Week'),
+    el('button', {
+      class: 'nav-btn', ...(atLatest ? { disabled: 'disabled' } : {}),
+      onclick: () => { if (!atLatest) { trendsWeekKey = shiftWeekKey(trendsWeekKey, 1); renderTrends(); } },
+    }, 'Next Week ›'),
+  ]));
+
+  const weekLabel = formatWeekLabel(weekDates[0], weekDates[6]);
+  const isSunday = new Date().getDay() === 0;
+  container.appendChild(el('div', { class: 'trends-week-label' },
+    weekLabel + (atLatest && isSunday ? ' — it’s Sunday, good day to reflect' : '')));
+
+  const stats = computeWeekStats(weekDates);
+
+  container.appendChild(renderDayCompletionRow(stats));
+  container.appendChild(renderSkippedBlocks(stats));
+  container.appendChild(renderStuckTasks(stats));
+  container.appendChild(renderReflectionBox(trendsWeekKey));
+
+  container.appendChild(el('div', { class: 'trend-hint' },
+    'Notice something that needs to change? Tell your assistant and it’ll update your schedule.'));
+}
+
+function formatWeekLabel(startISO, endISO) {
+  const s = new Date(startISO + 'T12:00:00');
+  const e = new Date(endISO + 'T12:00:00');
+  const fmt = (d) => d.toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
+  return `${fmt(s)} – ${fmt(e)}`;
+}
+
+function renderDayCompletionRow(stats) {
+  const wrap = el('div', { class: 'trend-section' }, [el('h3', {}, 'Daily Completion')]);
+  const row = el('div', { class: 'day-bar-row' });
+  const dayLabels = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
+  stats.days.forEach((d, i) => {
+    const pct = d.total ? Math.round((d.checkedCount / d.total) * 100) : 0;
+    row.appendChild(el('div', { class: 'day-bar' + (d.isFuture ? ' day-bar-future' : '') }, [
+      el('div', { class: 'day-bar-track' }, [
+        el('div', { class: 'day-bar-fill', style: `height:${d.isFuture ? 0 : pct}%` }),
+      ]),
+      el('div', { class: 'day-bar-pct' }, d.isFuture ? '—' : pct + '%'),
+      el('div', { class: 'day-bar-label' }, dayLabels[i]),
+    ]));
+  });
+  wrap.appendChild(row);
+  return wrap;
+}
+
+function renderSkippedBlocks(stats) {
+  const wrap = el('div', { class: 'trend-section' }, [el('h3', {}, 'Most Skipped This Week')]);
+  if (!stats.leaderboard.length) {
+    wrap.appendChild(el('p', { class: 'trend-empty' }, 'Nothing skipped yet this week.'));
+    return wrap;
+  }
+  const list = el('div', { class: 'skip-list' });
+  stats.leaderboard.forEach((item) => {
+    list.appendChild(el('div', { class: 'skip-row' }, [
+      el('span', { class: 'skip-label' }, item.label),
+      el('span', { class: 'skip-count' }, `${item.skipped}/${item.of}`),
+    ]));
+  });
+  wrap.appendChild(list);
+  return wrap;
+}
+
+function renderStuckTasks(stats) {
+  const wrap = el('div', { class: 'trend-section' }, [
+    el('h3', {}, 'Tasks'),
+    el('p', { class: 'trend-sub' }, `${stats.completedTasks} of ${stats.totalTasks} completed`),
+  ]);
+  if (stats.stuckTasks.length) {
+    wrap.appendChild(el('div', { class: 'stuck-callout' }, [
+      el('strong', {}, 'Possibly stuck — carried 2+ days:'),
+      el('ul', {}, stats.stuckTasks.map((t) => el('li', {}, `${t.text} (${t.carriedCount}×)`))),
+    ]));
+  }
+  return wrap;
+}
+
+function renderReflectionBox(weekKey) {
+  const wrap = el('div', { class: 'trend-section reflection-box' }, [
+    el('h3', {}, 'Sunday Reflection'),
+    el('p', { class: 'trend-sub' }, 'What’s working? What’s not? What needs to change?'),
+  ]);
+  const textarea = el('textarea', {
+    class: 'reflection-textarea',
+    placeholder: 'Write your weekly reflection here...',
+    oninput: (e) => { state.weeklyReflections[weekKey] = e.target.value; saveState(); },
+  });
+  textarea.value = state.weeklyReflections[weekKey] || '';
+  wrap.appendChild(textarea);
+  return wrap;
 }
 
 function setTimer(minutes) {

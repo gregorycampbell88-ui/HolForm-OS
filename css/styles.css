@@ -155,9 +155,9 @@ header {
   background: none;
   border: 1px solid var(--charcoal-2);
   color: var(--mid-gray);
-  padding: 9px;
+  padding: 9px 4px;
   border-radius: 8px;
-  font-size: 0.85rem;
+  font-size: 0.76rem;
   cursor: pointer;
 }
 
@@ -456,6 +456,121 @@ main {
 
 .sortable-ghost {
   opacity: 0.4;
+}
+
+/* trends */
+.trends-week-label {
+  font-size: 0.85rem;
+  color: var(--light-gray);
+  margin-bottom: 18px;
+}
+
+.trend-section {
+  margin-bottom: 24px;
+}
+.trend-section h3 {
+  margin: 0 0 4px;
+  font-size: 0.92rem;
+}
+.trend-sub {
+  font-size: 0.78rem;
+  color: var(--mid-gray);
+  margin: 0 0 10px;
+}
+.trend-empty {
+  font-size: 0.82rem;
+  color: var(--mid-gray);
+  margin: 0;
+}
+
+.day-bar-row {
+  display: flex;
+  gap: 8px;
+  align-items: flex-end;
+}
+.day-bar {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+}
+.day-bar-track {
+  width: 100%;
+  height: 90px;
+  background: var(--charcoal);
+  border-radius: 6px;
+  display: flex;
+  align-items: flex-end;
+  overflow: hidden;
+}
+.day-bar-fill {
+  width: 100%;
+  background: var(--green);
+  border-radius: 6px 6px 0 0;
+  min-height: 2px;
+}
+.day-bar-future .day-bar-fill { background: var(--charcoal-2); }
+.day-bar-pct {
+  font-size: 0.7rem;
+  font-weight: 700;
+  color: var(--light-gray);
+}
+.day-bar-label {
+  font-size: 0.68rem;
+  color: var(--mid-gray);
+}
+
+.skip-list {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.skip-row {
+  display: flex;
+  justify-content: space-between;
+  background: var(--charcoal);
+  border-radius: 8px;
+  padding: 9px 12px;
+  font-size: 0.85rem;
+}
+.skip-count {
+  color: var(--warm);
+  font-weight: 700;
+  font-size: 0.78rem;
+}
+
+.stuck-callout {
+  background: var(--charcoal);
+  border-left: 3px solid var(--warm);
+  border-radius: 6px;
+  padding: 10px 12px;
+  font-size: 0.82rem;
+}
+.stuck-callout strong { color: var(--warm); font-size: 0.78rem; }
+.stuck-callout ul { margin: 6px 0 0; padding-left: 18px; }
+.stuck-callout li { margin-bottom: 3px; }
+
+.reflection-textarea {
+  width: 100%;
+  min-height: 120px;
+  background: var(--charcoal);
+  border: 1px solid var(--charcoal-2);
+  color: var(--white);
+  padding: 12px;
+  border-radius: 8px;
+  font-size: 0.88rem;
+  font-family: inherit;
+  resize: vertical;
+}
+.reflection-textarea:focus { outline: 1px solid var(--green); }
+
+.trend-hint {
+  font-size: 0.76rem;
+  color: var(--mid-gray);
+  text-align: center;
+  padding-top: 8px;
+  border-top: 1px solid var(--charcoal-2);
 }
 
 /* dashboard */
