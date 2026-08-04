@@ -18,6 +18,7 @@ const DEFAULT_STATE = {
   lastRolloverDate: null,
   dayMeta: {},          // { [dateISO]: {groupKey, season} } — locks in which template a day used
   weeklyReflections: {}, // { [weekKey]: string }
+  scheduleOverrides: {}, // { [groupKey]: {anchorMinutes, items:[{id,label,category,accent,durationMin}]} }
 };
 
 let state = loadState();
@@ -62,6 +63,48 @@ function parseTimeToMinutes(t) {
 function nowMinutes() {
   const d = new Date();
   return d.getHours() * 60 + d.getMinutes();
+}
+
+function formatMinutes(mins) {
+  const h = Math.floor(mins / 60) % 24;
+  const m = ((mins % 60) + 60) % 60;
+  const ap = h < 12 ? 'a' : 'p';
+  let h12 = h % 12;
+  if (h12 === 0) h12 = 12;
+  return `${h12}:${String(m).padStart(2, '0')}${ap}`;
+}
+
+function minutesToInputTime(mins) {
+  const h = Math.floor(mins / 60) % 24;
+  const m = ((mins % 60) + 60) % 60;
+  return `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`;
+}
+
+function inputTimeToMinutes(str) {
+  const [h, m] = str.split(':').map(Number);
+  return h * 60 + m;
+}
+
+function getEffectiveChain(groupKey) {
+  return state.scheduleOverrides[groupKey] || BASE_CHAINS[groupKey];
+}
+
+function materializeChain(chain) {
+  let cursor = chain.anchorMinutes;
+  return chain.items.map((item) => {
+    const startMin = cursor;
+    const endMin = item.durationMin > 0 ? cursor + item.durationMin : null;
+    cursor += item.durationMin;
+    return {
+      id: item.id,
+      label: item.label,
+      category: item.category,
+      accent: item.accent,
+      durationMin: item.durationMin,
+      start: formatMinutes(startMin),
+      end: endMin != null ? formatMinutes(endMin) : null,
+    };
+  });
 }
 
 function getWeekKey(dateISO) {
@@ -158,10 +201,18 @@ function renderHeader() {
 function renderToday() {
   const container = document.getElementById('view-today');
   container.innerHTML = '';
+  if (scheduleEditSortable) { scheduleEditSortable.destroy(); scheduleEditSortable = null; }
 
   const d = new Date(state.selectedDate + 'T12:00:00');
   const weekday = d.getDay();
-  const { groupKey, blocks } = getScheduleFor(state.season, weekday);
+  const groupKey = DAY_GROUP[state.season][weekday];
+
+  if (editingGroupKey === groupKey) {
+    container.appendChild(renderScheduleEditor());
+    return;
+  }
+
+  const blocks = materializeChain(getEffectiveChain(groupKey));
   const note = getDayNote(state.season, weekday);
   const isToday = state.selectedDate === todayISO();
   const checksForDay = state.checks[state.selectedDate] || {};
@@ -196,7 +247,7 @@ function renderToday() {
     }
   }
 
-  // minimum-viable-day toggle
+  // minimum-viable-day toggle + edit
   container.appendChild(el('div', { class: 'min-toggle-row' }, [
     el('button', {
       class: 'min-toggle-btn' + (isMinimum ? ' active' : ''),
@@ -205,14 +256,15 @@ function renderToday() {
         saveState(); render();
       }
     }, isMinimum ? '✓ Minimum-Viable Day' : 'Shrink to Minimum-Viable Day'),
+    el('button', { class: 'edit-schedule-btn', onclick: () => startEditingSchedule(groupKey) }, '✎ Edit Schedule'),
   ]));
 
   if (isMinimum) {
     container.appendChild(renderMinimumList(checksForDay));
   } else {
     const list = el('div', { class: 'block-list' });
-    blocks.forEach((b, idx) => {
-      list.appendChild(renderBlock(b, idx, checksForDay, nowMinutes(), isToday));
+    blocks.forEach((b) => {
+      list.appendChild(renderBlock(b, checksForDay, nowMinutes(), isToday));
     });
     container.appendChild(list);
   }
@@ -248,14 +300,14 @@ function renderMinimumList(checksForDay) {
   return wrap;
 }
 
-function renderBlock(b, idx, checksForDay, nowMin, isToday) {
+function renderBlock(b, checksForDay, nowMin, isToday) {
   const start = parseTimeToMinutes(b.start);
   const end = parseTimeToMinutes(b.end);
   const isCurrent = isToday && start != null && (end != null ? (nowMin >= start && nowMin < end) : Math.abs(nowMin - start) < 30);
   const classes = ['block', `block-${b.category}`];
   if (b.accent) classes.push(`accent-${b.accent}`);
   if (isCurrent) classes.push('block-current');
-  const checked = !!checksForDay[idx];
+  const checked = !!checksForDay[b.id];
 
   const timeStr = b.start ? (b.start.toUpperCase() + (b.end ? '–' + b.end.toUpperCase() : '')) : '';
 
@@ -263,7 +315,7 @@ function renderBlock(b, idx, checksForDay, nowMin, isToday) {
     el('input', {
       type: 'checkbox', class: 'block-check',
       ...(checked ? { checked: 'checked' } : {}),
-      onchange: (e) => toggleCheck(idx, e.target.checked),
+      onchange: (e) => toggleCheck(b.id, e.target.checked),
     }),
     el('div', { class: 'block-body' }, [
       timeStr ? el('div', { class: 'block-time' }, timeStr) : null,
@@ -287,6 +339,152 @@ function shiftDate(delta) {
   state.selectedDate = d.toISOString().slice(0, 10);
   saveState();
   render();
+}
+
+// ---------- schedule editor ----------
+
+let editingGroupKey = null;
+let editDraft = null;
+let scheduleEditSortable = null;
+
+function startEditingSchedule(groupKey) {
+  const base = getEffectiveChain(groupKey);
+  editDraft = { anchorMinutes: base.anchorMinutes, items: base.items.map((i) => ({ ...i })) };
+  editingGroupKey = groupKey;
+  render();
+}
+
+function stopEditingSchedule() {
+  editingGroupKey = null;
+  editDraft = null;
+  if (scheduleEditSortable) { scheduleEditSortable.destroy(); scheduleEditSortable = null; }
+  render();
+}
+
+function saveEditDraft() {
+  state.scheduleOverrides[editingGroupKey] = {
+    anchorMinutes: editDraft.anchorMinutes,
+    items: editDraft.items.map((i) => ({ ...i })),
+  };
+  saveState();
+}
+
+function renderScheduleEditor() {
+  const wrap = el('div', { class: 'schedule-editor' });
+  wrap.appendChild(el('div', { class: 'editor-header' }, [
+    el('h3', {}, 'Editing: ' + (GROUP_LABELS[editingGroupKey] || editingGroupKey)),
+    el('p', { class: 'trend-sub' }, 'Drag ⠿ to reorder — each block keeps its length, times shift to match.'),
+  ]));
+
+  const list = el('ul', { class: 'edit-block-list' });
+
+  wrap.appendChild(el('div', { class: 'control-field' }, [
+    el('label', {}, 'STARTS AT'),
+    el('input', {
+      type: 'time', class: 'text-input', value: minutesToInputTime(editDraft.anchorMinutes),
+      oninput: (e) => {
+        const v = inputTimeToMinutes(e.target.value);
+        if (!isNaN(v)) { editDraft.anchorMinutes = v; saveEditDraft(); updateEditorTimeBadges(list); }
+      },
+    }),
+  ]));
+
+  wrap.appendChild(list);
+  renderEditorListInto(list);
+
+  const addInput = el('input', { type: 'text', class: 'text-input', placeholder: 'New block label, then Add' });
+  const addBlock = () => {
+    if (!addInput.value.trim()) return;
+    editDraft.items.push({ id: 'blk-' + Date.now(), label: addInput.value.trim(), category: 'flex', accent: null, durationMin: 30 });
+    addInput.value = '';
+    saveEditDraft();
+    renderEditorListInto(list);
+  };
+  addInput.addEventListener('keydown', (e) => { if (e.key === 'Enter' || e.keyCode === 13) { e.preventDefault(); addBlock(); } });
+  wrap.appendChild(el('div', { class: 'lot-input-row' }, [
+    addInput,
+    el('button', { class: 'lot-add-btn', onclick: addBlock }, 'Add'),
+  ]));
+
+  wrap.appendChild(el('div', { class: 'editor-footer' }, [
+    el('button', {
+      class: 'nav-btn', onclick: () => {
+        delete state.scheduleOverrides[editingGroupKey];
+        saveState();
+        stopEditingSchedule();
+      }
+    }, 'Reset to Default'),
+    el('button', { class: 'nav-btn today-btn', onclick: stopEditingSchedule }, 'Done'),
+  ]));
+
+  return wrap;
+}
+
+function updateEditorTimeBadges(list) {
+  let cursor = editDraft.anchorMinutes;
+  const rows = list.querySelectorAll('.edit-block-row');
+  editDraft.items.forEach((item, idx) => {
+    const startMin = cursor;
+    const endMin = item.durationMin > 0 ? cursor + item.durationMin : null;
+    cursor += item.durationMin;
+    const timeStr = formatMinutes(startMin) + (endMin != null ? '–' + formatMinutes(endMin) : '');
+    const badge = rows[idx] && rows[idx].querySelector('.edit-block-time');
+    if (badge) badge.textContent = timeStr;
+  });
+}
+
+function renderEditorListInto(list) {
+  list.innerHTML = '';
+  if (scheduleEditSortable) { scheduleEditSortable.destroy(); scheduleEditSortable = null; }
+
+  let cursor = editDraft.anchorMinutes;
+  editDraft.items.forEach((item) => {
+    const startMin = cursor;
+    const endMin = item.durationMin > 0 ? cursor + item.durationMin : null;
+    cursor += item.durationMin;
+    const timeStr = formatMinutes(startMin) + (endMin != null ? '–' + formatMinutes(endMin) : '');
+
+    const row = el('li', { class: 'edit-block-row' });
+    row.appendChild(el('div', { class: 'edit-block-top' }, [
+      el('span', { class: 'drag-handle' }, '⠿'),
+      el('span', { class: 'edit-block-time' }, timeStr),
+      el('button', {
+        class: 'lot-remove', onclick: () => {
+          editDraft.items = editDraft.items.filter((i) => i.id !== item.id);
+          saveEditDraft();
+          renderEditorListInto(list);
+        }
+      }, '×'),
+    ]));
+    row.appendChild(el('input', {
+      type: 'text', class: 'text-input edit-block-label', value: item.label,
+      oninput: (e) => { item.label = e.target.value; saveEditDraft(); },
+    }));
+    row.appendChild(el('div', { class: 'edit-block-duration-row' }, [
+      el('input', {
+        type: 'number', class: 'duration-input', min: '0', step: '5', value: String(item.durationMin),
+        oninput: (e) => {
+          item.durationMin = Math.max(0, parseInt(e.target.value, 10) || 0);
+          saveEditDraft();
+          updateEditorTimeBadges(list);
+        },
+      }),
+      el('span', { class: 'duration-unit' }, 'min'),
+    ]));
+    list.appendChild(row);
+  });
+
+  if (window.Sortable) {
+    scheduleEditSortable = new Sortable(list, {
+      handle: '.drag-handle', animation: 150,
+      onEnd: (evt) => {
+        const [moved] = editDraft.items.splice(evt.oldIndex, 1);
+        editDraft.items.splice(evt.newIndex, 0, moved);
+        saveEditDraft();
+        renderEditorListInto(list);
+      },
+    });
+  }
 }
 
 function renderControlPanel() {
@@ -490,11 +688,11 @@ function computeWeekStats(weekDates) {
   const today = todayISO();
   const days = weekDates.map((dateISO) => {
     const weekday = new Date(dateISO + 'T12:00:00').getDay();
-    const meta = state.dayMeta[dateISO] || { season: state.season };
-    const { blocks } = getScheduleFor(meta.season, weekday);
+    const meta = state.dayMeta[dateISO] || { groupKey: DAY_GROUP[state.season][weekday] };
+    const blocks = materializeChain(getEffectiveChain(meta.groupKey));
     const checksForDay = state.checks[dateISO] || {};
     const total = blocks.length;
-    const checkedCount = blocks.reduce((n, b, idx) => n + (checksForDay[idx] ? 1 : 0), 0);
+    const checkedCount = blocks.reduce((n, b) => n + (checksForDay[b.id] ? 1 : 0), 0);
     const isFuture = dateISO > today;
     return { dateISO, total, checkedCount, isFuture, blocks, checksForDay };
   });
@@ -502,9 +700,9 @@ function computeWeekStats(weekDates) {
   const skipCounts = {};
   const appearCounts = {};
   days.filter((d) => !d.isFuture).forEach((d) => {
-    d.blocks.forEach((b, idx) => {
+    d.blocks.forEach((b) => {
       appearCounts[b.label] = (appearCounts[b.label] || 0) + 1;
-      if (!d.checksForDay[idx]) skipCounts[b.label] = (skipCounts[b.label] || 0) + 1;
+      if (!d.checksForDay[b.id]) skipCounts[b.label] = (skipCounts[b.label] || 0) + 1;
     });
   });
   const leaderboard = Object.keys(skipCounts)

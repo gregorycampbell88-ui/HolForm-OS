@@ -93,23 +93,23 @@ const DRIVING_TTH = [
 
 const SATURDAY = [
   { start: '6:00a',  end: null,     label: 'Wake', category: 'anchor' },
-  { start: null,     end: null,     label: 'Time with God', category: 'anchor', accent: 'spirit' },
-  { start: null,     end: null,     label: 'Gym, sauna, and shower', category: 'anchor', accent: 'spirit' },
-  { start: '10:00a', end: '12:30p', label: 'Flex block — check Friday’s Red / Yellow / Green', category: 'flex' },
-  { start: null,     end: null,     label: 'Family and open time', category: 'flex', accent: 'family' },
-  { start: null,     end: null,     label: 'Protected date window (2–4 hrs)', category: 'anchor', accent: 'family' },
+  { start: '6:00a',  end: '6:30a',  label: 'Time with God', category: 'anchor', accent: 'spirit' },
+  { start: '6:30a',  end: '9:30a',  label: 'Gym, sauna, and shower', category: 'anchor', accent: 'spirit' },
+  { start: '9:30a',  end: '12:00p', label: 'Flex block — check Friday’s Red / Yellow / Green', category: 'flex' },
+  { start: '12:00p', end: '4:00p',  label: 'Family and open time', category: 'flex', accent: 'family' },
+  { start: '4:00p',  end: '8:00p',  label: 'Protected date window (2–4 hrs)', category: 'anchor', accent: 'family' },
 ];
 
 const SUNDAY = [
-  { start: null,     end: null,     label: 'Wake after 7½–8 hrs sleep', category: 'anchor' },
-  { start: null,     end: null,     label: 'Longer, Spirit-led time with God', category: 'anchor', accent: 'spirit' },
+  { start: '7:00a',  end: null,     label: 'Wake after 7½–8 hrs sleep', category: 'anchor' },
+  { start: '7:00a',  end: '9:00a',  label: 'Longer, Spirit-led time with God', category: 'anchor', accent: 'spirit' },
   { start: '9:00a',  end: null,     label: 'Arrive at church', category: 'anchor', accent: 'spirit' },
-  { start: null,     end: '11:30a', label: 'Worship and service', category: 'anchor', accent: 'spirit' },
-  { start: null,     end: null,     label: 'Lunch', category: 'buffer' },
-  { start: null,     end: null,     label: 'Easy run', category: 'flex', accent: 'spirit' },
-  { start: null,     end: null,     label: 'Family and rest', category: 'flex', accent: 'family' },
-  { start: null,     end: null,     label: 'Weekly marriage check-in', category: 'anchor', accent: 'family' },
-  { start: null,     end: null,     label: 'Post scheduling only if necessary — max 20 min', category: 'flex' },
+  { start: '9:00a',  end: '11:30a', label: 'Worship and service', category: 'anchor', accent: 'spirit' },
+  { start: '11:30a', end: '12:15p', label: 'Lunch', category: 'buffer' },
+  { start: '12:15p', end: '1:00p',  label: 'Easy run', category: 'flex', accent: 'spirit' },
+  { start: '1:00p',  end: '7:30p',  label: 'Family and rest', category: 'flex', accent: 'family' },
+  { start: '7:30p',  end: '8:30p',  label: 'Weekly marriage check-in', category: 'anchor', accent: 'family' },
+  { start: '8:30p',  end: '8:50p',  label: 'Post scheduling only if necessary — max 20 min', category: 'flex' },
 ];
 
 const SCHEDULES = {
@@ -147,3 +147,57 @@ function getScheduleFor(season, weekday) {
 function getDayNote(season, weekday) {
   return (DAY_NOTES[season] && DAY_NOTES[season][weekday]) || null;
 }
+
+const GROUP_LABELS = {
+  'transition-mwf': 'Mon / Wed / Fri — Transition',
+  'transition-tth': 'Tue / Thu — Transition',
+  'driving-mwf': 'Mon / Wed / Fri — Driving',
+  'driving-tth': 'Tue / Thu — Driving',
+  saturday: 'Saturday',
+  sunday: 'Sunday',
+};
+
+// ---- duration-chain derivation ----
+// Every block gets a fixed durationMin so that reordering keeps each
+// block's length intact while the displayed clock times shift to match
+// its new position. Duration is inferred as the gap to the NEXT block's
+// start (so travel/dead time between blocks is folded into the block
+// before it); the last block falls back to its own end time, or 20 min.
+
+function _chainParseTime(t) {
+  if (!t) return null;
+  const m = t.match(/^(\d{1,2}):(\d{2})([ap])$/i);
+  if (!m) return null;
+  let h = parseInt(m[1], 10);
+  const min = parseInt(m[2], 10);
+  const ap = m[3].toLowerCase();
+  if (ap === 'p' && h !== 12) h += 12;
+  if (ap === 'a' && h === 12) h = 0;
+  return h * 60 + min;
+}
+
+function deriveBaseChain(blocks) {
+  const anchorMinutes = _chainParseTime(blocks[0].start);
+  const items = blocks.map((b, idx) => {
+    const start = _chainParseTime(b.start);
+    const nextStart = idx < blocks.length - 1 ? _chainParseTime(blocks[idx + 1].start) : null;
+    const end = _chainParseTime(b.end);
+    let durationMin;
+    if (nextStart != null && start != null) durationMin = Math.max(0, nextStart - start);
+    else if (end != null && start != null) durationMin = Math.max(0, end - start);
+    else durationMin = 20;
+    return {
+      id: `base-${idx}`,
+      label: b.label,
+      category: b.category,
+      accent: b.accent || null,
+      durationMin,
+    };
+  });
+  return { anchorMinutes, items };
+}
+
+const BASE_CHAINS = {};
+Object.keys(SCHEDULES).forEach((key) => {
+  BASE_CHAINS[key] = deriveBaseChain(SCHEDULES[key]);
+});

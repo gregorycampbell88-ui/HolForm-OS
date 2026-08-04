@@ -214,9 +214,9 @@ main {
   margin-bottom: 14px;
 }
 
-.min-toggle-row { margin-bottom: 14px; }
+.min-toggle-row { margin-bottom: 14px; display: flex; gap: 8px; }
 .min-toggle-btn {
-  width: 100%;
+  flex: 1;
   background: var(--charcoal);
   border: 1px solid var(--warm);
   color: var(--warm);
@@ -230,6 +230,73 @@ main {
   color: var(--black);
   font-weight: 700;
 }
+
+.edit-schedule-btn {
+  flex: 1;
+  background: var(--charcoal);
+  border: 1px solid var(--blue);
+  color: var(--blue);
+  padding: 10px;
+  border-radius: 8px;
+  font-size: 0.85rem;
+  cursor: pointer;
+}
+
+/* schedule editor */
+.schedule-editor { padding-bottom: 20px; }
+.editor-header h3 { margin: 0 0 4px; font-size: 1rem; }
+.editor-header { margin-bottom: 16px; }
+
+.edit-block-list {
+  list-style: none;
+  margin: 0 0 16px;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.edit-block-row {
+  background: var(--charcoal);
+  border: 1px solid var(--charcoal-2);
+  border-radius: 10px;
+  padding: 10px;
+}
+.edit-block-top {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 8px;
+}
+.edit-block-time {
+  flex: 1;
+  font-size: 0.72rem;
+  font-weight: 700;
+  color: var(--green);
+  letter-spacing: 0.02em;
+}
+.edit-block-label { margin-bottom: 8px; }
+.edit-block-duration-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.duration-input {
+  width: 70px;
+  background: var(--charcoal-2);
+  border: 1px solid var(--mid-gray);
+  color: var(--white);
+  padding: 6px 8px;
+  border-radius: 6px;
+  font-size: 0.85rem;
+}
+.duration-unit { font-size: 0.76rem; color: var(--mid-gray); }
+
+.editor-footer {
+  display: flex;
+  gap: 8px;
+  margin-top: 16px;
+}
+.editor-footer .nav-btn { flex: 1; }
 
 .block-list {
   display: flex;
