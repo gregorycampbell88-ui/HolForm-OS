@@ -1,4 +1,4 @@
-const CACHE = 'holform-os-v6';
+const CACHE = 'holform-os-v7';
 const ASSETS = [
   './',
   './index.html',
@@ -11,6 +11,7 @@ const ASSETS = [
   './icons/icon-192.png',
   './icons/icon-512.png',
   './icons/apple-touch-icon.png',
+  './icons/holform-wordmark.png',
 ];
 
 self.addEventListener('install', (e) => {

@@ -56,6 +56,8 @@ header {
 }
 
 .brand-row h1 span { color: var(--green); }
+.brand-row h1 { line-height: 0; }
+.brand-logo { height: 32px; width: auto; display: block; }
 
 .header-actions {
   display: flex;
