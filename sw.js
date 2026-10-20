@@ -1,4 +1,4 @@
-const CACHE = 'holform-os-v5';
+const CACHE = 'holform-os-v6';
 const ASSETS = [
   './',
   './index.html',
@@ -8,7 +8,9 @@ const ASSETS = [
   './js/sync.js',
   './js/firebase-config.js',
   './manifest.json',
-  './icons/icon.svg',
+  './icons/icon-192.png',
+  './icons/icon-512.png',
+  './icons/apple-touch-icon.png',
 ];
 
 self.addEventListener('install', (e) => {
