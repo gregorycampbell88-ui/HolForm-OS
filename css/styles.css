@@ -842,3 +842,8 @@ main {
 .aura-pulse { animation: auraPulse 3s ease-in-out infinite; transform-origin: 100px 124px; }
 @keyframes auraPulse { 0%, 100% { opacity: 0.75; } 50% { opacity: 1; } }
 @media (prefers-reduced-motion: reduce) { .aura-pulse { animation: none; } }
+
+.chip-row-center { justify-content: center; }
+.flame { animation: flameFlicker 1.4s ease-in-out infinite alternate; transform-box: fill-box; transform-origin: 50% 100%; }
+@keyframes flameFlicker { from { opacity: 0.85; } to { opacity: 1; } }
+@media (prefers-reduced-motion: reduce) { .flame { animation: none; } }

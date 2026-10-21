@@ -40,81 +40,6 @@ const MISSIONS = [
 // Revenue-first order. Editing only floats up after a harder mission is done today.
 const MISSION_PRIORITY = ['start-convo', 'continue-convo', 'find-people', 'content-idea', 'film', 'edit'];
 
-// ---- character catalogs (lv = level that unlocks the item) ----
-const CHARS = [
-  { id: 'kai', label: 'Kai', blurb: 'Focused', lv: 1, eye: '#2c6fb5', tilt: 0, iris: [8.5, 11] },
-  { id: 'ren', label: 'Ren', blurb: 'Fierce', lv: 1, eye: '#1fa36b', tilt: 4, iris: [8, 11.5] },
-  { id: 'mika', label: 'Mika', blurb: 'Bright', lv: 1, eye: '#b5612c', tilt: -1, iris: [9.5, 11.5] },
-];
-const SKINS = [
-  { id: 's1', label: 'Fair', lv: 1, color: '#fbe0cf' },
-  { id: 's2', label: 'Light', lv: 1, color: '#f2c6a0' },
-  { id: 's3', label: 'Tan', lv: 1, color: '#d9a273' },
-  { id: 's4', label: 'Brown', lv: 1, color: '#b57a4e' },
-  { id: 's5', label: 'Deep', lv: 1, color: '#8a5a3a' },
-  { id: 's6', label: 'Dark', lv: 1, color: '#5e3a26' },
-];
-const HAIR_STYLES = [
-  { id: 'short', label: 'Short', lv: 1 },
-  { id: 'swept', label: 'Swept', lv: 1 },
-  { id: 'long', label: 'Long', lv: 2 },
-  { id: 'spiky', label: 'Spiky', lv: 4 },
-  { id: 'bun', label: 'Top bun', lv: 6 },
-];
-const HAIR_COLORS = [
-  { id: 'black', label: 'Black', lv: 1, color: '#1b1b22' },
-  { id: 'brown', label: 'Brown', lv: 1, color: '#5a3a22' },
-  { id: 'blonde', label: 'Blonde', lv: 1, color: '#e0b84a' },
-  { id: 'red', label: 'Red', lv: 1, color: '#b8442c' },
-  { id: 'blue', label: 'Blue', lv: 1, color: '#3b6fd8' },
-  { id: 'green', label: 'Green', lv: 3, color: '#16a268' },
-  { id: 'white', label: 'White', lv: 6, color: '#e8ecef' },
-  { id: 'purple', label: 'Purple', lv: 8, color: '#7a4fd0' },
-];
-const OUTFITS = [
-  { id: 'tee', label: 'HF Tee', lv: 1 },
-  { id: 'hoodie', label: 'Hoodie', lv: 1 },
-  { id: 'tank', label: 'Gym Tank', lv: 2 },
-  { id: 'jacket', label: 'Suit Jacket', lv: 3 },
-  { id: 'gi', label: 'Dojo Gi', lv: 5 },
-  { id: 'armor', label: 'Armor', lv: 7 },
-  { id: 'champion', label: 'Champion', lv: 9 },
-];
-const ACCESSORIES = [
-  { id: 'none', label: 'None', lv: 1 },
-  { id: 'headband', label: 'Headband', lv: 2 },
-  { id: 'glasses', label: 'Glasses', lv: 3 },
-  { id: 'headphones', label: 'Headphones', lv: 4 },
-  { id: 'cap', label: 'Cap', lv: 6 },
-  { id: 'chain', label: 'Gold chain', lv: 8 },
-  { id: 'laurel', label: 'Laurel', lv: 11 },
-];
-const BACKGROUNDS = [
-  { id: 'plain', label: 'Plain', lv: 1 },
-  { id: 'sunrise', label: 'Sunrise', lv: 2 },
-  { id: 'city', label: 'City', lv: 4 },
-  { id: 'stars', label: 'Stars', lv: 6 },
-  { id: 'forest', label: 'Forest', lv: 8 },
-  { id: 'arena', label: 'Arena', lv: 10 },
-];
-const AURAS = [
-  { id: 'none', label: 'None', lv: 1 },
-  { id: 'glow', label: 'Green glow', lv: 3 },
-  { id: 'ember', label: 'Ember', lv: 5 },
-  { id: 'volt', label: 'Volt', lv: 7 },
-  { id: 'gold', label: 'Gold', lv: 9 },
-];
-const CATALOG_SECTIONS = [
-  { key: 'base', label: 'Character', items: CHARS, onboarding: true },
-  { key: 'skin', label: 'Skin tone', items: SKINS, onboarding: true },
-  { key: 'hairStyle', label: 'Hairstyle', items: HAIR_STYLES, onboarding: true },
-  { key: 'hairColor', label: 'Hair color', items: HAIR_COLORS, onboarding: true },
-  { key: 'outfit', label: 'Outfit', items: OUTFITS, onboarding: true },
-  { key: 'accessory', label: 'Accessory', items: ACCESSORIES },
-  { key: 'background', label: 'Background', items: BACKGROUNDS },
-  { key: 'aura', label: 'Aura effect', items: AURAS },
-];
-
 // ---- state helpers ----
 
 const questUI = {
@@ -129,9 +54,20 @@ const questUI = {
   saveNote: '',
 };
 
+// v2 = the ranger design. Older saved characters (v1, the cartoon avatar) are
+// reset so the player re-picks a ranger; XP and missions are kept.
+function qDefaultAvatar() {
+  return {
+    v: 2, chosen: false, morphed: true,
+    suit: 'emerald', trim: 'gold', helmet: 'sentinel', emblem: 'tiger',
+    chest: 'standard', weapon: 'none', cape: 'none', beast: 'none', aura: 'none', background: 'plain',
+    base: 'kai', skin: 's3', hairStyle: 'short', hairColor: 'black',
+  };
+}
+
 function qDefaults() {
   return {
-    avatar: { chosen: false, base: 'kai', skin: 's3', hairStyle: 'short', hairColor: 'black', outfit: 'tee', accessory: 'none', background: 'plain', aura: 'none' },
+    avatar: qDefaultAvatar(),
     xp: 0,
     xpAwarded: {},
     tier: 0,
@@ -152,7 +88,8 @@ function qEnsure() {
   const d = qDefaults();
   const q = state.quest && typeof state.quest === 'object' ? state.quest : {};
   state.quest = Object.assign(d, q);
-  state.quest.avatar = Object.assign(qDefaults().avatar, q.avatar || {});
+  const savedAvatar = q.avatar && q.avatar.v === 2 ? q.avatar : {};
+  state.quest.avatar = Object.assign(qDefaultAvatar(), savedAvatar);
   state.quest.calTimes = Object.assign(qDefaults().calTimes, q.calTimes || {});
   if (!state.weeklyAdjustments) state.weeklyAdjustments = {};
 }
@@ -427,203 +364,6 @@ function qOnBlockChecked(key, val, date) {
 function qOnTaskChecked(task) {
   qEnsure();
   awardXp(Q_XP.task, 'task:' + task.id, todayISO());
-}
-
-// ---- avatar art (layered SVG) ----
-
-function shade(hex, amt) {
-  const n = parseInt(hex.slice(1), 16);
-  let r = (n >> 16) & 255, g = (n >> 8) & 255, b = n & 255;
-  const target = amt < 0 ? 0 : 255;
-  const p = Math.abs(amt);
-  r = Math.round((target - r) * p + r);
-  g = Math.round((target - g) * p + g);
-  b = Math.round((target - b) * p + b);
-  return '#' + ((1 << 24) + (r << 16) + (g << 8) + b).toString(16).slice(1);
-}
-
-const SHOULDERS = 'M24 240 C24 190 56 168 100 168 C144 168 176 190 176 240 Z';
-const FACE = 'M60 100 C60 70 80 58 100 58 C120 58 140 70 140 100 C140 128 124 152 100 152 C76 152 60 128 60 100 Z';
-
-function avatarSVG(a) {
-  const ch = CHARS.find((c) => c.id === a.base) || CHARS[0];
-  const skin = (SKINS.find((s) => s.id === a.skin) || SKINS[2]).color;
-  const skinD = shade(skin, -0.14);
-  const hair = (HAIR_COLORS.find((c) => c.id === a.hairColor) || HAIR_COLORS[0]).color;
-  const hairD = shade(hair, -0.25);
-  const hairL = shade(hair, 0.18);
-  const id = 'a' + Math.random().toString(36).slice(2, 8);
-  let defs = '';
-
-  // background
-  let bg = '';
-  switch (a.background) {
-    case 'sunrise':
-      defs += `<linearGradient id="${id}-bg" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#ffb870"/><stop offset=".7" stop-color="#e4604f"/><stop offset="1" stop-color="#5a2d52"/></linearGradient>`;
-      bg = `<rect width="200" height="240" fill="url(#${id}-bg)"/><circle cx="100" cy="176" r="48" fill="#ffe7a3" opacity=".9"/><path d="M0 200 Q50 178 100 198 T200 190 L200 240 L0 240 Z" fill="#3a1d3f"/>`;
-      break;
-    case 'city': {
-      defs += `<linearGradient id="${id}-bg" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#1c3b5a"/><stop offset="1" stop-color="#0a121c"/></linearGradient>`;
-      const b = [[0, 150, 34, 90], [30, 128, 30, 112], [60, 160, 28, 80], [112, 140, 34, 100], [146, 118, 30, 122], [172, 152, 28, 88]];
-      bg = `<rect width="200" height="240" fill="url(#${id}-bg)"/>` +
-        b.map((r) => `<rect x="${r[0]}" y="${r[1]}" width="${r[2]}" height="${r[3]}" fill="#0b1520"/>`).join('') +
-        [[10, 164], [20, 180], [40, 146], [46, 170], [118, 156], [130, 176], [154, 136], [166, 160], [180, 172]]
-          .map((w) => `<rect x="${w[0]}" y="${w[1]}" width="5" height="5" fill="#ffd36a" opacity=".8"/>`).join('');
-      break;
-    }
-    case 'stars':
-      bg = `<rect width="200" height="240" fill="#0a0e1c"/>` +
-        [[20, 30, 1.6], [60, 18, 1.2], [150, 26, 1.8], [180, 60, 1.2], [30, 90, 1], [170, 100, 1.4], [110, 12, 1], [16, 150, 1.3], [184, 160, 1.1], [100, 40, .8], [46, 54, 1], [136, 70, 1]]
-          .map((s) => `<circle cx="${s[0]}" cy="${s[1]}" r="${s[2]}" fill="#fff"/>`).join('');
-      break;
-    case 'forest':
-      defs += `<linearGradient id="${id}-bg" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#14473a"/><stop offset="1" stop-color="#0a1f1a"/></linearGradient>`;
-      bg = `<rect width="200" height="240" fill="url(#${id}-bg)"/>` +
-        [[16, 130], [50, 100], [152, 110], [184, 140]].map((t) => `<polygon points="${t[0]},${t[1]} ${t[0] - 22},${t[1] + 70} ${t[0] + 22},${t[1] + 70}" fill="#0c2e25"/><polygon points="${t[0]},${t[1] - 24} ${t[0] - 17},${t[1] + 30} ${t[0] + 17},${t[1] + 30}" fill="#0f3b2f"/>`).join('');
-      break;
-    case 'arena':
-      bg = `<rect width="200" height="240" fill="#140e24"/><polygon points="40,0 64,0 112,240 0,240" fill="#fff" opacity=".06"/><polygon points="160,0 184,0 200,240 88,240" fill="#fff" opacity=".06"/>`;
-      break;
-    default:
-      bg = `<rect width="200" height="240" fill="#161c20"/>`;
-  }
-
-  // aura
-  let aura = '';
-  const auraColor = { glow: '#00bb79', ember: '#ff7a2f', volt: '#3aa5d8', gold: '#ffd54a' }[a.aura];
-  if (auraColor) {
-    defs += `<radialGradient id="${id}-au" cx="50%" cy="50%" r="50%"><stop offset="0" stop-color="${auraColor}" stop-opacity=".75"/><stop offset=".6" stop-color="${auraColor}" stop-opacity=".35"/><stop offset="1" stop-color="${auraColor}" stop-opacity="0"/></radialGradient>`;
-    aura = `<circle class="aura-pulse" cx="100" cy="124" r="104" fill="url(#${id}-au)"/>`;
-    if (a.aura === 'ember') {
-      const flame = '<path d="M26 200 C12 178 30 170 24 146 C44 164 46 186 38 202 Z" fill="#ff9d4a" opacity=".85"/><path d="M44 214 C36 198 46 192 44 176 C56 188 56 202 52 214 Z" fill="#ffd27a" opacity=".85"/>';
-      aura += flame + `<g transform="translate(200 0) scale(-1 1)">${flame}</g>`;
-    } else if (a.aura === 'volt') {
-      const bolt = '<polyline points="30,56 44,84 32,88 48,120" stroke="#9be3ff" stroke-width="3" fill="none" stroke-linejoin="round"/><polyline points="18,110 30,128 22,132 34,154" stroke="#9be3ff" stroke-width="2.5" fill="none" stroke-linejoin="round"/>';
-      aura += bolt + `<g transform="translate(200 0) scale(-1 1)">${bolt}</g>`;
-    } else if (a.aura === 'gold') {
-      const spark = (x, y, s) => `<path transform="translate(${x} ${y}) scale(${s})" d="M0 -8 L2 -2 L8 0 L2 2 L0 8 L-2 2 L-8 0 L-2 -2 Z" fill="#fff3b0"/>`;
-      aura += spark(30, 70, 1.2) + spark(172, 90, 1) + spark(44, 150, .8) + spark(160, 40, .9) + spark(22, 30, .7);
-    }
-  }
-
-  // hair layers
-  let hairBack = '';
-  let hairFront = '';
-  const CAP = `M56 104 C48 64 72 40 100 40 C128 40 152 64 144 104 C140 92 134 82 124 76 C116 84 104 82 98 72 C90 82 76 84 68 78 C62 84 58 94 56 104 Z`;
-  switch (a.hairStyle) {
-    case 'swept':
-      hairFront = `<path d="M54 106 C44 62 76 38 108 40 C136 42 152 66 144 106 C140 90 130 78 114 72 C98 70 76 80 66 96 C62 100 58 104 54 106 Z" fill="${hair}"/><path d="M70 92 C84 70 112 64 136 74 C116 74 96 82 82 100 Z" fill="${hairL}"/>`;
-      break;
-    case 'long':
-      hairBack = `<path d="M52 98 C42 150 48 200 60 226 L140 226 C152 200 158 150 148 98 C140 60 60 60 52 98 Z" fill="${hair}"/>`;
-      hairFront = `<path d="M56 104 C48 64 72 40 100 40 C128 40 152 64 144 104 C138 92 126 78 100 70 C74 78 62 92 56 104 Z" fill="${hair}"/><path d="M62 96 C70 74 90 66 100 66" stroke="${hairL}" stroke-width="3" fill="none" stroke-linecap="round"/>`;
-      break;
-    case 'spiky':
-      hairBack = `<path d="M58 74 L48 42 L76 58 L84 26 L100 52 L116 24 L124 58 L152 40 L142 76 Z" fill="${hair}"/>`;
-      hairFront = `<path d="${CAP}" fill="${hair}"/>`;
-      break;
-    case 'bun':
-      hairBack = `<circle cx="100" cy="34" r="16" fill="${hair}"/><circle cx="100" cy="34" r="16" fill="none" stroke="${hairD}" stroke-width="2"/>`;
-      hairFront = `<path d="${CAP}" fill="${hair}"/>`;
-      break;
-    default:
-      hairFront = `<path d="${CAP}" fill="${hair}"/><path d="M70 62 C80 52 96 48 110 50" stroke="${hairL}" stroke-width="3" fill="none" stroke-linecap="round"/>`;
-  }
-
-  // outfit
-  let base = `<path d="${SHOULDERS}" fill="#2d3a40"/>`;
-  let details = '';
-  switch (a.outfit) {
-    case 'hoodie':
-      base = `<path d="${SHOULDERS}" fill="#00925e"/>`;
-      details = `<path d="M66 172 Q100 204 134 172 L142 186 Q100 218 58 186 Z" fill="#00774d"/><path d="M92 196 L90 226 M108 196 L110 226" stroke="#e8ecef" stroke-width="3" stroke-linecap="round"/>`;
-      break;
-    case 'tank':
-      base = `<path d="${SHOULDERS}" fill="${skin}"/>`;
-      details = `<path d="M50 240 L56 192 Q74 174 88 172 Q100 190 112 172 Q126 174 144 192 L150 240 Z" fill="#00bb79"/>`;
-      break;
-    case 'jacket':
-      base = `<path d="${SHOULDERS}" fill="#1e2a3a"/>`;
-      details = `<path d="M84 168 L100 204 L116 168 Z" fill="#f4f6f7"/><path d="M84 168 L96 214 L70 232 L58 196 Z M116 168 L104 214 L130 232 L142 196 Z" fill="#162030"/><path d="M97 190 L103 190 L106 226 L100 234 L94 226 Z" fill="#00bb79"/>`;
-      break;
-    case 'gi':
-      base = `<path d="${SHOULDERS}" fill="#eef1f2"/>`;
-      details = `<path d="M72 170 L100 218 L128 170" fill="none" stroke="#c9d0d4" stroke-width="7" stroke-linejoin="round"/><rect x="32" y="226" width="136" height="10" fill="#111"/>`;
-      break;
-    case 'armor':
-      base = `<path d="${SHOULDERS}" fill="#394650"/>`;
-      details = `<ellipse cx="46" cy="198" rx="26" ry="15" fill="#00bb79" transform="rotate(-18 46 198)"/><ellipse cx="154" cy="198" rx="26" ry="15" fill="#00bb79" transform="rotate(18 154 198)"/><path d="M72 178 L128 178 L120 226 L80 226 Z" fill="#2b353d" stroke="#00bb79" stroke-width="2"/>`;
-      break;
-    case 'champion':
-      base = `<path d="${SHOULDERS}" fill="#0e1113"/>`;
-      details = `<path d="M26 236 C26 196 52 172 76 170 L82 176 C58 182 40 204 40 238 Z" fill="#00bb79"/><g transform="translate(200 0) scale(-1 1)"><path d="M26 236 C26 196 52 172 76 170 L82 176 C58 182 40 204 40 238 Z" fill="#00bb79"/></g><path d="M78 168 L100 190 L122 168 L128 160 L100 176 L72 160 Z" fill="#ffd54a"/><path d="M100 190 L100 240" stroke="#ffd54a" stroke-width="3"/>`;
-      break;
-    default:
-      details = `<path d="M82 168 Q100 188 118 168" fill="none" stroke="#46565d" stroke-width="5" stroke-linecap="round"/><text x="100" y="222" text-anchor="middle" font-family="Arial,sans-serif" font-weight="800" font-size="20" fill="#00bb79">HF</text>`;
-  }
-  const neck = `<rect x="88" y="140" width="24" height="36" rx="8" fill="${skinD}"/>`;
-
-  // face
-  const t = ch.tilt;
-  const eyes = [82, 118].map((cx, i) => {
-    const flip = i === 0 ? 1 : -1;
-    const outer = cx - flip * 13;
-    return `<ellipse cx="${cx}" cy="112" rx="11" ry="13" fill="#fff"/>` +
-      `<ellipse cx="${cx}" cy="113" rx="${ch.iris[0]}" ry="${ch.iris[1]}" fill="${ch.eye}"/>` +
-      `<ellipse cx="${cx}" cy="114" rx="4.5" ry="6.5" fill="#14141a"/>` +
-      `<circle cx="${cx - 3}" cy="108" r="3" fill="#fff"/><circle cx="${cx + 3}" cy="118" r="1.5" fill="#fff" opacity=".9"/>` +
-      `<path d="M${outer} ${108 - t} Q${cx} 98 ${cx + flip * 12} 107" stroke="#14141a" stroke-width="3" fill="none" stroke-linecap="round"/>`;
-  }).join('');
-  const face =
-    `<circle cx="58" cy="108" r="8" fill="${skin}"/><circle cx="142" cy="108" r="8" fill="${skin}"/>` +
-    `<circle cx="58" cy="108" r="4" fill="${skinD}"/><circle cx="142" cy="108" r="4" fill="${skinD}"/>` +
-    `<path d="${FACE}" fill="${skin}"/>` +
-    `<ellipse cx="72" cy="128" rx="8" ry="4" fill="#ff7a7a" opacity=".22"/><ellipse cx="128" cy="128" rx="8" ry="4" fill="#ff7a7a" opacity=".22"/>` +
-    eyes +
-    `<path d="M70 94 Q82 ${90 - t / 2} 93 93" stroke="${hairD}" stroke-width="3.2" fill="none" stroke-linecap="round"/>` +
-    `<path d="M107 93 Q118 ${90 - t / 2} 130 94" stroke="${hairD}" stroke-width="3.2" fill="none" stroke-linecap="round"/>` +
-    `<path d="M99 124 Q100 128 102 128" stroke="${skinD}" stroke-width="2" fill="none" stroke-linecap="round"/>` +
-    `<path d="M92 137 Q100 144 108 137" stroke="#7a3434" stroke-width="2.6" fill="none" stroke-linecap="round"/>`;
-
-  // accessory
-  let acc = '';
-  switch (a.accessory) {
-    case 'headband':
-      acc = `<path d="M57 80 Q100 64 143 80 L143 91 Q100 77 57 91 Z" fill="#00bb79"/><circle cx="143" cy="86" r="5" fill="#00925e"/>`;
-      break;
-    case 'glasses':
-      acc = `<rect x="68" y="99" width="28" height="26" rx="10" fill="#fff" fill-opacity=".14" stroke="#14141a" stroke-width="3"/><rect x="104" y="99" width="28" height="26" rx="10" fill="#fff" fill-opacity=".14" stroke="#14141a" stroke-width="3"/><path d="M96 110 L104 110" stroke="#14141a" stroke-width="3"/>`;
-      break;
-    case 'headphones':
-      acc = `<path d="M55 102 C50 40 150 40 145 102" stroke="#20262a" stroke-width="7" fill="none"/><rect x="46" y="96" width="15" height="30" rx="6" fill="#20262a"/><rect x="139" y="96" width="15" height="30" rx="6" fill="#20262a"/><rect x="50" y="104" width="4" height="14" fill="#00bb79"/><rect x="146" y="104" width="4" height="14" fill="#00bb79"/>`;
-      break;
-    case 'cap':
-      acc = `<path d="M54 84 C54 44 146 44 146 84 Z" fill="#0e1113" stroke="#00bb79" stroke-width="2"/><path d="M50 86 Q100 96 156 82 L156 90 Q100 104 48 94 Z" fill="#00925e"/><text x="100" y="72" text-anchor="middle" font-family="Arial,sans-serif" font-weight="800" font-size="14" fill="#00bb79">HF</text>`;
-      break;
-    case 'chain':
-      acc = `<path d="M78 170 Q100 198 122 170" stroke="#ffd54a" stroke-width="3.5" fill="none"/><circle cx="100" cy="193" r="6" fill="#ffd54a"/>`;
-      break;
-    case 'laurel': {
-      const leaves = [];
-      for (let i = 0; i < 7; i++) {
-        const ang = Math.PI * (0.18 + 0.64 * (i / 6));
-        const x = 100 + Math.cos(Math.PI + ang) * 50 * -1;
-        const y = 80 - Math.sin(ang) * 36;
-        leaves.push(`<ellipse cx="${x.toFixed(1)}" cy="${y.toFixed(1)}" rx="8" ry="4" fill="#ffd54a" transform="rotate(${(-60 + i * 20)} ${x.toFixed(1)} ${y.toFixed(1)})"/>`);
-      }
-      acc = leaves.join('');
-      break;
-    }
-    default:
-      acc = '';
-  }
-
-  return `<svg viewBox="0 0 200 240" xmlns="http://www.w3.org/2000/svg" class="avatar-svg" role="img" aria-label="Your character"><defs>${defs}</defs>` +
-    bg + aura +
-    `<g stroke="${shade(hair, 0.32)}" stroke-width="1.4" stroke-linejoin="round">${hairBack}</g>` +
-    base + neck + details + face +
-    `<g stroke="${shade(hair, 0.32)}" stroke-width="1.4" stroke-linejoin="round">${hairFront}</g>` +
-    acc + `</svg>`;
 }
 
 // ---- UI ----
@@ -979,9 +719,13 @@ function renderCustomizer(onboarding) {
   const q = state.quest;
   const level = levelInfo(q.xp).level;
   const wrap = el('div', { class: 'q-customizer' });
-  wrap.appendChild(el('div', { class: 'q-section-title' }, onboarding ? 'Choose your character' : 'Customize your character'));
-  if (onboarding) wrap.appendChild(el('div', { class: 'q-sub' }, 'Pick a look to start. Level up to unlock outfits, hairstyles, accessories, backgrounds, and auras.'));
+  wrap.appendChild(el('div', { class: 'q-section-title' }, onboarding ? 'Build your ranger' : 'Customize your ranger'));
+  if (onboarding) wrap.appendChild(el('div', { class: 'q-sub' }, 'Pick your suit, helmet, and emblem to start. Level up to unlock chest shields, weapons, capes, guardian beasts, and power-ups.'));
   wrap.appendChild(el('div', { class: 'avatar-wrap avatar-preview', html: avatarSVG(q.avatar) }));
+  wrap.appendChild(el('div', { class: 'chip-row chip-row-center' }, [
+    el('button', { class: 'chip' + (q.avatar.morphed ? ' chip-on' : ''), onclick: () => { q.avatar.morphed = true; saveState(); render(); } }, 'Helmet on'),
+    el('button', { class: 'chip' + (!q.avatar.morphed ? ' chip-on' : ''), onclick: () => { q.avatar.morphed = false; saveState(); render(); } }, 'Helmet off'),
+  ]));
 
   CATALOG_SECTIONS.filter((s) => !onboarding || s.onboarding).forEach((sec) => {
     wrap.appendChild(el('div', { class: 'q-custom-label' }, sec.label));
