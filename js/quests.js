@@ -60,7 +60,7 @@ const questUI = {
 function qDefaultAvatar() {
   return {
     v: 2, chosen: false, morphed: true, facePhoto: false, useArt: true,
-    suit: 'emerald', trim: 'gold', helmet: 'sentinel', emblem: 'tiger',
+    suit: 'crimson', trim: 'gold', helmet: 'sentinel', emblem: 'tiger',
     chest: 'standard', gloves: 'standard', boots: 'standard', weapon: 'none', cape: 'none', beast: 'none', aura: 'none', background: 'plain',
     base: 'kai', skin: 's3', hairStyle: 'short', hairColor: 'black',
   };
@@ -93,6 +93,22 @@ function qEnsure() {
   state.quest.avatar = Object.assign(qDefaultAvatar(), savedAvatar);
   state.quest.calTimes = Object.assign(qDefaults().calTimes, q.calTimes || {});
   if (!state.weeklyAdjustments) state.weeklyAdjustments = {};
+  qSanitizeAvatar();
+}
+
+// A locked item can't stay selected (e.g. Emerald, now a late unlock): fall back
+// to the default, or the first item that is unlocked at the current level.
+function qSanitizeAvatar() {
+  const a = state.quest.avatar;
+  const level = levelInfo(state.quest.xp).level;
+  const def = qDefaultAvatar();
+  CATALOG_SECTIONS.forEach((s) => {
+    const cur = s.items.find((i) => i.id === a[s.key]);
+    if (cur && cur.lv <= level) return;
+    const fallback = s.items.find((i) => i.id === def[s.key] && i.lv <= level)
+      || s.items.find((i) => i.lv <= level) || s.items[0];
+    a[s.key] = fallback.id;
+  });
 }
 
 function xpToReach(n) { return 25 * (n - 1) * n; }
@@ -108,7 +124,8 @@ function levelInfo(xp) {
 
 function unlocksAtLevel(lv) {
   const out = [];
-  CATALOG_SECTIONS.forEach((s) => s.items.forEach((i) => { if (i.lv === lv && lv > 1) out.push(i.label); }));
+  const suffix = { suit: ' suit', trim: ' trim', hairColor: ' hair', background: ' background' };
+  CATALOG_SECTIONS.forEach((s) => s.items.forEach((i) => { if (i.lv === lv && lv > 1) out.push(i.label + (suffix[s.key] || '')); }));
   return out;
 }
 

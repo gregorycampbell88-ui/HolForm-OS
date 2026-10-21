@@ -3,19 +3,30 @@
 // (original design; lv = level that unlocks the item)
 // ============================================================
 
+// Suit colors: four to start, the rest unlock one per level in this order.
+// Emerald is last on purpose (the favorite). Its color value (#14a85f) must
+// stay matched to the green in the imported art so it needs no recoloring.
 const SUITS = [
-  { id: 'emerald', label: 'Emerald', lv: 1, color: '#14a85f' },
   { id: 'crimson', label: 'Crimson', lv: 1, color: '#d23b3b' },
-  { id: 'cobalt', label: 'Cobalt', lv: 1, color: '#2d63d8' },
   { id: 'solar', label: 'Solar', lv: 1, color: '#e8b82a' },
+  { id: 'cobalt', label: 'Cobalt', lv: 1, color: '#2d63d8' },
   { id: 'rose', label: 'Rose', lv: 1, color: '#e0589a' },
-  { id: 'onyx', label: 'Onyx', lv: 1, color: '#2b3036' },
-  { id: 'violet', label: 'Violet', lv: 8, color: '#7a4fd0' },
+  { id: 'onyx', label: 'Onyx', lv: 2, color: '#2b3036' },
+  { id: 'orange', label: 'Orange', lv: 3, color: '#ee7d1f' },
+  { id: 'white', label: 'White', lv: 4, color: '#eef2f4' },
+  { id: 'violet', label: 'Violet', lv: 5, color: '#7a4fd0' },
+  { id: 'silver', label: 'Silver', lv: 6, color: '#b9c2c8' },
+  { id: 'navy', label: 'Navy', lv: 7, color: '#1d3470' },
+  { id: 'graphite', label: 'Graphite', lv: 8, color: '#4a5058' },
+  { id: 'gold', label: 'Gold', lv: 9, color: '#cc9a1a' },
+  { id: 'emerald', label: 'Emerald', lv: 10, color: '#14a85f' },
 ];
+// Trim: gold to start; white, silver, then onyx unlock.
 const TRIMS = [
   { id: 'gold', label: 'Gold', lv: 1, color: '#f2c14e' },
-  { id: 'silver', label: 'Silver', lv: 1, color: '#cfd6dc' },
-  { id: 'white', label: 'White', lv: 1, color: '#f4f6f7' },
+  { id: 'white', label: 'White', lv: 3, color: '#f4f6f7' },
+  { id: 'silver', label: 'Silver', lv: 5, color: '#cfd6dc' },
+  { id: 'onyx', label: 'Onyx', lv: 7, color: '#2b3036' },
 ];
 const HELMETS = [
   { id: 'sentinel', label: 'Sentinel', lv: 1 },
