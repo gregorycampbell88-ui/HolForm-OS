@@ -526,6 +526,7 @@ function renderControlPanel() {
     if (!state.parkingLot[day]) state.parkingLot[day] = [];
     state.parkingLot[day].push({ id: Date.now(), text: lotInput.value.trim() });
     lotInput.value = '';
+    if (window.Quest) Quest.onParked();
     saveState();
     render();
   };

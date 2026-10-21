@@ -879,3 +879,12 @@ main {
 .q-art-thumb { width: 34px; height: 34px; object-fit: contain; flex: none; background: #161c20; border-radius: 4px; display: flex; align-items: center; justify-content: center; color: var(--mid-gray); }
 .q-art-name { flex: 1; min-width: 0; }
 .q-art .chip { margin-top: 8px; }
+
+/* titles */
+.q-title { font-size: 0.74rem; font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase; color: var(--green); margin: -2px 0 6px; }
+.q-titles summary { cursor: pointer; font-weight: 700; font-size: 0.9rem; margin-bottom: 6px; }
+.q-title-row { display: flex; align-items: center; gap: 10px; padding: 8px 0; border-top: 1px solid var(--charcoal-2); }
+.q-title-text { flex: 1; min-width: 0; font-size: 0.8rem; }
+.q-title-name { font-weight: 700; font-size: 0.88rem; }
+.q-newtitle { border-color: var(--warm); }
+.q-newtitle .q-kicker { color: var(--warm); }

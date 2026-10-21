@@ -1,4 +1,4 @@
-const CACHE = 'holform-os-v19';
+const CACHE = 'holform-os-v20';
 const ASSETS = [
   './',
   './index.html',
@@ -14,6 +14,7 @@ const ASSETS = [
   './art/beast.webp',
   './art/sword.png',
   './art/morpher.png',
+  './js/titles.js',
   './js/quests.js',
   './js/sync.js',
   './js/firebase-config.js',

@@ -45,6 +45,7 @@ const MISSION_PRIORITY = ['start-convo', 'continue-convo', 'find-people', 'conte
 const questUI = {
   customizing: false,
   artOpen: false,
+  titlesOpen: false,
   editBudget: 20,
   editFinish: EDIT_DEFAULT_FINISH,
   skipIdx: 0,
@@ -66,9 +67,20 @@ function qDefaultAvatar() {
   };
 }
 
+function qStatsDefault() {
+  return {
+    missions: 0, convos: 0, edits: 0, cleanEdits: 0, editsExtended: 0, saves: 0, resumes: 0,
+    sessions: 0, tasksDone: 0, blocks: 0, minChecks: 0, parked: 0, morning: 0,
+    revenueFirst: 0, morphs: 0, comebacks: 0, days: [],
+  };
+}
+
 function qDefaults() {
   return {
     avatar: qDefaultAvatar(),
+    titles: { unlocked: {}, equipped: 'recruit' },
+    newTitles: [],
+    stats: qStatsDefault(),
     xp: 0,
     xpAwarded: {},
     tier: 0,
@@ -92,8 +104,78 @@ function qEnsure() {
   const savedAvatar = q.avatar && q.avatar.v === 2 ? q.avatar : {};
   state.quest.avatar = Object.assign(qDefaultAvatar(), savedAvatar);
   state.quest.calTimes = Object.assign(qDefaults().calTimes, q.calTimes || {});
+  state.quest.stats = Object.assign(qStatsDefault(), q.stats || {});
+  state.quest.titles = Object.assign({ unlocked: {}, equipped: 'recruit' }, q.titles || {});
+  if (!Array.isArray(state.quest.newTitles)) state.quest.newTitles = [];
   if (!state.weeklyAdjustments) state.weeklyAdjustments = {};
   qSanitizeAvatar();
+}
+
+// ---- titles (catalog lives in js/titles.js; locked ones are never displayed) ----
+
+function bestStreak(days) {
+  const sorted = [...new Set(days)].sort();
+  let best = 0, cur = 0, prev = null;
+  sorted.forEach((d) => {
+    if (prev) {
+      const diff = Math.round((new Date(d + 'T12:00:00') - new Date(prev + 'T12:00:00')) / 86400000);
+      cur = diff === 1 ? cur + 1 : 1;
+    } else cur = 1;
+    best = Math.max(best, cur);
+    prev = d;
+  });
+  return best;
+}
+
+function qTitleContext() {
+  const q = state.quest;
+  const done = q.log.filter((l) => l.status === 'finished');
+  const perDay = {};
+  const weeks = {};
+  done.forEach((l) => {
+    perDay[l.date] = (perDay[l.date] || 0) + 1;
+    const wk = getWeekKey(l.date);
+    if (!weeks[wk]) weeks[wk] = { ids: new Set(), dows: new Set() };
+    weeks[wk].ids.add(l.missionId);
+    weeks[wk].dows.add(new Date(l.date + 'T12:00:00').getDay());
+  });
+  const wk = Object.values(weeks);
+  return {
+    q, state, s: q.stats, level: levelInfo(q.xp).level,
+    replies: done.filter((l) => l.reply === true).length,
+    maxPerDay: Math.max(0, ...Object.values(perDay)),
+    wellRounded: wk.some((w) => MISSIONS.every((m) => w.ids.has(m.id))),
+    tueThu: wk.some((w) => w.dows.has(2) && w.dows.has(4)),
+    reflections: Object.values(state.weeklyReflections || {}).filter((t) => t && t.trim()).length,
+    adjustments: Object.values(state.weeklyAdjustments || {}).filter((t) => t && t.trim()).length,
+    bestStreak: bestStreak(q.stats.days),
+  };
+}
+
+// Unlocks any newly earned titles. Returns true if something changed.
+function qCheckTitles() {
+  const q = state.quest;
+  const ctx = qTitleContext();
+  let added = false;
+  TITLES.forEach((t) => {
+    if (q.titles.unlocked[t.id]) return;
+    let ok = false;
+    try { ok = !!t.test(ctx); } catch (e) { ok = false; }
+    if (!ok) return;
+    q.titles.unlocked[t.id] = todayISO();
+    if (t.id !== 'recruit') q.newTitles.push(t.id);
+    added = true;
+  });
+  return added;
+}
+
+function titleById(id) { return TITLES.find((t) => t.id === id); }
+
+function equipTitle(id) {
+  if (!state.quest.titles.unlocked[id]) return;
+  state.quest.titles.equipped = id;
+  saveState();
+  render();
 }
 
 // A locked item can't stay selected (e.g. Emerald, now a late unlock): fall back
@@ -136,6 +218,15 @@ function awardXp(amount, key, date) {
     if (!q.xpAwarded[d]) q.xpAwarded[d] = {};
     if (q.xpAwarded[d][key]) return 0;
     q.xpAwarded[d][key] = true;
+  }
+  // any progress counts as an active day (for streaks and "comeback" titles)
+  const today = todayISO();
+  const days = q.stats.days;
+  if (!days.includes(today)) {
+    const last = days.length ? days.slice().sort().pop() : null;
+    if (last && Math.round((new Date(today + 'T12:00:00') - new Date(last + 'T12:00:00')) / 86400000) >= 4) q.stats.comebacks += 1;
+    days.push(today);
+    if (days.length > 120) days.splice(0, days.length - 120);
   }
   const before = levelInfo(q.xp).level;
   q.xp += amount;
@@ -300,11 +391,26 @@ function finishMission() {
     minutes: m.minutes, extensions: m.extensions, status: 'finished', reply: null,
   });
   if (q.log.length > 400) q.log.length = 400;
+
+  // stats that feed titles
+  const s = q.stats;
+  s.missions += 1;
+  if (m.kind === 'convo') s.convos += 1;
+  if (m.id === 'edit') {
+    s.edits += 1;
+    if (m.extensions > 0) s.editsExtended += 1; else s.cleanEdits += 1;
+    const today = todayISO();
+    if (q.log.some((l) => l.date === today && l.status === 'finished' && l.missionId !== 'edit')) s.revenueFirst += 1;
+  }
+  if (q.savedPlaces.some((p) => p.missionId === m.id)) s.resumes += 1;
+  if (new Date().getHours() < 9) s.morning += 1;
+
   q.savedPlaces = q.savedPlaces.filter((p) => p.missionId !== m.id);
   const xp = awardXp(Q_XP.mission);
   const rewardMsg = progressReward();
   q.activeMission = null;
   questUI.result = { title: m.title, xp, rewardMsg };
+  qCheckTitles();
   saveState();
   render();
 }
@@ -320,8 +426,10 @@ function savePlace(note) {
   if (q.log.length > 400) q.log.length = 400;
   q.savedPlaces = q.savedPlaces.filter((p) => p.missionId !== m.id);
   q.savedPlaces.unshift({ id: 'p' + qNow(), missionId: m.id, title: m.title, note: note || '', savedAt: qNow() });
+  q.stats.saves += 1;
   q.activeMission = null;
   questUI.result = { title: m.title, saved: true };
+  qCheckTitles();
   saveState();
   render();
 }
@@ -351,6 +459,8 @@ function finishSession() {
   if (!q.activeSession) return;
   questUI.nextAnchor = getNextAnchor();
   q.activeSession = null;
+  q.stats.sessions += 1;
+  qCheckTitles();
   saveState();
   render();
 }
@@ -376,12 +486,25 @@ function rankedMissions(available) {
 function qOnBlockChecked(key, val, date) {
   if (!val || date !== todayISO()) return;
   qEnsure();
-  awardXp(Q_XP.block, 'blk:' + key, date);
+  if (awardXp(Q_XP.block, 'blk:' + key, date)) {
+    state.quest.stats.blocks += 1;
+    if (String(key).startsWith('min-')) state.quest.stats.minChecks += 1;
+    qCheckTitles();
+  }
 }
 
 function qOnTaskChecked(task) {
   qEnsure();
-  awardXp(Q_XP.task, 'task:' + task.id, todayISO());
+  if (awardXp(Q_XP.task, 'task:' + task.id, todayISO())) {
+    state.quest.stats.tasksDone += 1;
+    qCheckTitles();
+  }
+}
+
+function qOnParked() {
+  qEnsure();
+  state.quest.stats.parked += 1;
+  qCheckTitles();
 }
 
 // ---- UI ----
@@ -399,17 +522,61 @@ function renderQuest() {
   if (!q.avatar.chosen) { c.appendChild(renderCustomizer(true)); return; }
   if (questUI.customizing) { c.appendChild(renderCustomizer(false)); return; }
 
+  // pick up titles that depend on level, gear, or Sunday reflections
+  if (qCheckTitles()) saveState();
+
   c.appendChild(renderCharacterCard());
   if (q.levelUp) c.appendChild(renderLevelUp());
+  if (q.newTitles.length) c.appendChild(renderNewTitle());
   if (questUI.result) c.appendChild(renderResult());
   if (questUI.nextAnchor) c.appendChild(renderNextAnchor());
   c.appendChild(renderSessionPanel());
   c.appendChild(renderMissionPanel());
   const extras = renderSavedAndConvos();
   if (extras) c.appendChild(extras);
+  c.appendChild(renderTitles());
   c.appendChild(renderCalendarCard());
   c.appendChild(renderRecentLog());
   qUpdateCountdowns();
+}
+
+function renderNewTitle() {
+  const q = state.quest;
+  const t = titleById(q.newTitles[0]);
+  if (!t) { q.newTitles.shift(); return el('div', {}); }
+  const more = q.newTitles.length - 1;
+  return el('div', { class: 'q-card q-levelup q-newtitle' }, [
+    el('div', { class: 'q-kicker' }, 'NEW TITLE'),
+    el('div', { class: 'q-big' }, t.name),
+    el('div', { class: 'q-sub' }, t.desc),
+    more > 0 ? el('div', { class: 'q-sub q-dim' }, `+${more} more waiting`) : null,
+    el('div', { class: 'q-row q-row-tight' }, [
+      el('button', { class: 'q-btn', onclick: () => { q.titles.equipped = t.id; q.newTitles.shift(); saveState(); render(); } }, 'Equip it'),
+      el('button', { class: 'q-btn q-btn-ghost', onclick: () => { q.newTitles.shift(); saveState(); render(); } }, 'Nice'),
+    ]),
+  ]);
+}
+
+// Only discovered titles are listed. Locked ones (and how many exist) stay hidden.
+function renderTitles() {
+  const q = state.quest;
+  const mine = TITLES.filter((t) => q.titles.unlocked[t.id]);
+  const det = el('details', { class: 'q-card q-titles', ...(questUI.titlesOpen ? { open: 'open' } : {}) });
+  det.addEventListener('toggle', () => { questUI.titlesOpen = det.open; });
+  det.appendChild(el('summary', {}, `Titles · ${mine.length} discovered`));
+  det.appendChild(el('div', { class: 'q-sub q-dim' }, 'Some titles stay hidden until you earn them. Keep playing and see what turns up.'));
+  mine.forEach((t) => {
+    const on = q.titles.equipped === t.id;
+    det.appendChild(el('div', { class: 'q-title-row' }, [
+      el('div', { class: 'q-title-text' }, [el('div', { class: 'q-title-name' }, t.name), el('div', { class: 'q-dim' }, t.desc)]),
+      el('button', {
+        class: 'q-btn q-btn-small' + (on ? '' : ' q-btn-ghost'),
+        ...(on ? { disabled: 'disabled' } : {}),
+        onclick: () => equipTitle(t.id),
+      }, on ? 'Equipped' : 'Equip'),
+    ]));
+  });
+  return det;
 }
 
 // Your imported art (device-only) when present, otherwise the drawn pixel ranger.
@@ -431,7 +598,7 @@ function renderCharacterCard() {
   if (canMorph) {
     buttons.push(el('button', {
       class: 'morpher-btn', 'aria-label': q.avatar.morphed === false ? 'Helmet on' : 'Helmet off',
-      onclick: () => { q.avatar.morphed = q.avatar.morphed === false; saveState(); render(); },
+      onclick: () => { q.avatar.morphed = q.avatar.morphed === false; q.stats.morphs += 1; qCheckTitles(); saveState(); render(); },
     }, [
       ArtKit.has('morpher') ? el('img', { src: ArtKit.url('morpher'), alt: '' }) : null,
       el('span', {}, q.avatar.morphed === false ? 'Morph' : 'Unmorph'),
@@ -441,6 +608,7 @@ function renderCharacterCard() {
     el('div', { class: 'avatar-wrap' + (art ? ' art-wrap' : ''), html: avatarHTML(q.avatar) }),
     el('div', { class: 'q-char-info' }, [
       el('div', { class: 'q-level' }, `Level ${info.level}`),
+      el('div', { class: 'q-title' }, (titleById(q.titles.equipped) || titleById('recruit')).name),
       el('div', { class: 'xp-bar' }, [el('div', { class: 'xp-fill', style: `width:${info.pct}%` })]),
       el('div', { class: 'q-sub' }, `${info.into} / ${info.need} XP to Level ${info.level + 1}`),
       el('div', { class: 'q-sub q-dim' }, 'XP is permanent — spending sessions never lowers it.'),
@@ -931,4 +1099,5 @@ window.Quest = {
   init: qInit,
   onBlockChecked: qOnBlockChecked,
   onTaskChecked: qOnTaskChecked,
+  onParked: qOnParked,
 };
