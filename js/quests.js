@@ -60,7 +60,7 @@ function qDefaultAvatar() {
   return {
     v: 2, chosen: false, morphed: true, facePhoto: false,
     suit: 'emerald', trim: 'gold', helmet: 'sentinel', emblem: 'tiger',
-    chest: 'standard', weapon: 'none', cape: 'none', beast: 'none', aura: 'none', background: 'plain',
+    chest: 'standard', gloves: 'standard', boots: 'standard', weapon: 'none', cape: 'none', beast: 'none', aura: 'none', background: 'plain',
     base: 'kai', skin: 's3', hairStyle: 'short', hairColor: 'black',
   };
 }

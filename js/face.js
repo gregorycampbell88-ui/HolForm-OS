@@ -6,8 +6,8 @@
 // ============================================================
 
 const FACE_KEY = 'holform-os-face-v1';
-const FACE_GW = 16;
-const FACE_GH = 20;
+const FACE_GW = 14;
+const FACE_GH = 18;
 
 const Face = (() => {
   let data = null; // { src, zoom, ox, oy }
@@ -87,8 +87,8 @@ const Face = (() => {
     skinTone() {
       if (!px) return '#d9a273';
       let r = 0, g = 0, b = 0, n = 0;
-      for (let j = 11; j < 15; j++) {
-        for (let i = 5; i < 11; i++) {
+      for (let j = 10; j < 13; j++) {
+        for (let i = 4; i < 10; i++) {
           const v = parseInt(px[j * FACE_GW + i].slice(1), 16);
           r += (v >> 16) & 255; g += (v >> 8) & 255; b += v & 255; n++;
         }

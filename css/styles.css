@@ -854,3 +854,7 @@ main {
 .q-slider { display: flex; align-items: center; gap: 10px; font-size: 0.78rem; color: var(--light-gray); margin: 6px 0; }
 .q-slider span { width: 84px; flex: none; }
 .q-slider input[type="range"] { flex: 1; accent-color: var(--green); }
+
+/* full-body (2:3) sprite */
+.avatar-wrap { flex: 0 0 104px; }
+.avatar-preview { max-width: 190px; }
