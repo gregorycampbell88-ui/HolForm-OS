@@ -44,6 +44,7 @@ const MISSION_PRIORITY = ['start-convo', 'continue-convo', 'find-people', 'conte
 
 const questUI = {
   customizing: false,
+  artOpen: false,
   editBudget: 20,
   editFinish: EDIT_DEFAULT_FINISH,
   skipIdx: 0,
@@ -58,7 +59,7 @@ const questUI = {
 // reset so the player re-picks a ranger; XP and missions are kept.
 function qDefaultAvatar() {
   return {
-    v: 2, chosen: false, morphed: true, facePhoto: false,
+    v: 2, chosen: false, morphed: true, facePhoto: false, useArt: true,
     suit: 'emerald', trim: 'gold', helmet: 'sentinel', emblem: 'tiger',
     chest: 'standard', gloves: 'standard', boots: 'standard', weapon: 'none', cape: 'none', beast: 'none', aura: 'none', background: 'plain',
     base: 'kai', skin: 's3', hairStyle: 'short', hairColor: 'black',
@@ -394,17 +395,35 @@ function renderQuest() {
   qUpdateCountdowns();
 }
 
+// Your imported art (device-only) when present, otherwise the drawn pixel ranger.
+function artActive() { return typeof ArtKit !== 'undefined' && ArtKit.active(state.quest.avatar); }
+function avatarHTML(a) { return artActive() ? ArtKit.sceneHTML(a) : avatarSVG(a); }
+
 function renderCharacterCard() {
   const q = state.quest;
   const info = levelInfo(q.xp);
+  const art = artActive();
+  const canMorph = art && ArtKit.has('rangerOff');
+  const buttons = [
+    el('button', { class: 'q-btn q-btn-ghost', onclick: () => { questUI.customizing = true; render(); } }, 'Customize'),
+  ];
+  if (canMorph) {
+    buttons.push(el('button', {
+      class: 'morpher-btn', 'aria-label': q.avatar.morphed === false ? 'Helmet on' : 'Helmet off',
+      onclick: () => { q.avatar.morphed = q.avatar.morphed === false; saveState(); render(); },
+    }, [
+      ArtKit.has('morpher') ? el('img', { src: ArtKit.url('morpher'), alt: '' }) : null,
+      el('span', {}, q.avatar.morphed === false ? 'Morph' : 'Unmorph'),
+    ]));
+  }
   return el('div', { class: 'q-card q-character' }, [
-    el('div', { class: 'avatar-wrap', html: avatarSVG(q.avatar) }),
+    el('div', { class: 'avatar-wrap' + (art ? ' art-wrap' : ''), html: avatarHTML(q.avatar) }),
     el('div', { class: 'q-char-info' }, [
       el('div', { class: 'q-level' }, `Level ${info.level}`),
       el('div', { class: 'xp-bar' }, [el('div', { class: 'xp-fill', style: `width:${info.pct}%` })]),
       el('div', { class: 'q-sub' }, `${info.into} / ${info.need} XP to Level ${info.level + 1}`),
       el('div', { class: 'q-sub q-dim' }, 'XP is permanent — spending sessions never lowers it.'),
-      el('button', { class: 'q-btn q-btn-ghost', onclick: () => { questUI.customizing = true; render(); } }, 'Customize'),
+      el('div', { class: 'q-row q-row-tight' }, buttons),
     ]),
   ]);
 }
@@ -722,7 +741,7 @@ function renderFaceControls(preview) {
   const box = el('div', { class: 'q-face' });
   box.appendChild(el('div', { class: 'q-custom-label' }, 'Your face (helmet off) — private'));
 
-  const refresh = () => { preview.innerHTML = avatarSVG(q.avatar); };
+  const refresh = () => { preview.innerHTML = avatarHTML(q.avatar); };
   const msg = el('div', { class: 'q-sub q-dim' }, 'Photos are turned into pixel art on this device. Nothing is uploaded or synced; add it again on any other device.');
 
   const fileInput = el('input', {
@@ -772,21 +791,83 @@ function renderFaceControls(preview) {
   return box;
 }
 
+// In art mode only some categories apply to the flat artwork.
+const ART_ALLOWED = { suit: null, trim: null, weapon: ['none', 'blade'], beast: ['none', 'tiger'], aura: null, background: null };
+
+function customizerSections(onboarding) {
+  const art = artActive();
+  const out = [];
+  CATALOG_SECTIONS.forEach((s) => {
+    if (onboarding && !s.onboarding) return;
+    if (!art) { out.push(s); return; }
+    if (!(s.key in ART_ALLOWED)) return;
+    let allow = ART_ALLOWED[s.key];
+    if (s.key === 'weapon' && !ArtKit.has('sword')) allow = ['none'];
+    if (s.key === 'beast' && !ArtKit.has('beast')) allow = ['none'];
+    const items = allow ? s.items.filter((i) => allow.includes(i.id)) : s.items;
+    if (items.length > 1 || s.key === 'suit' || s.key === 'trim') out.push({ ...s, items });
+  });
+  return out;
+}
+
+function renderArtImport() {
+  const det = el('details', {
+    class: 'q-card q-art',
+    ...(questUI.artOpen || !ArtKit.has('ranger') ? { open: 'open' } : {}),
+  });
+  det.addEventListener('toggle', () => { questUI.artOpen = det.open; });
+  det.appendChild(el('summary', {}, ArtKit.has('ranger') ? 'Your art kit ✓' : 'Import your art kit'));
+  const msg = el('div', { class: 'q-sub q-dim' }, 'Private: images are saved only in this device’s browser storage — never uploaded, synced, or put on GitHub. Import them again on each device.');
+  det.appendChild(msg);
+
+  ART_SLOTS.forEach((slot) => {
+    const input = el('input', {
+      type: 'file', accept: 'image/*', class: 'hidden',
+      onchange: (e) => {
+        const f = e.target.files && e.target.files[0];
+        if (!f) return;
+        ArtKit.put(slot.key, f).then(() => render()).catch((err) => { msg.textContent = err.message; msg.classList.remove('q-dim'); });
+      },
+    });
+    det.appendChild(el('div', { class: 'q-art-row' }, [
+      ArtKit.has(slot.key) ? el('img', { class: 'q-art-thumb', src: ArtKit.url(slot.key), alt: '' }) : el('span', { class: 'q-art-thumb q-art-empty' }, '—'),
+      el('div', { class: 'q-art-name' }, [el('div', {}, slot.label), el('div', { class: 'q-dim' }, slot.hint)]),
+      input,
+      el('button', { class: 'q-btn q-btn-small', onclick: () => input.click() }, ArtKit.has(slot.key) ? 'Replace' : 'Choose'),
+      ArtKit.has(slot.key) ? el('button', { class: 'q-btn q-btn-small q-btn-ghost', onclick: () => ArtKit.remove(slot.key).then(() => render()) }, '×') : null,
+    ]));
+  });
+  if (ArtKit.has('ranger')) {
+    const on = state.quest.avatar.useArt !== false;
+    det.appendChild(el('button', {
+      class: 'chip',
+      onclick: () => { state.quest.avatar.useArt = !on; saveState(); render(); },
+    }, on ? 'Using my art — tap for drawn ranger' : 'Using drawn ranger — tap for my art'));
+  }
+  return det;
+}
+
 function renderCustomizer(onboarding) {
   const q = state.quest;
   const level = levelInfo(q.xp).level;
+  const art = artActive();
   const wrap = el('div', { class: 'q-customizer' });
   wrap.appendChild(el('div', { class: 'q-section-title' }, onboarding ? 'Build your ranger' : 'Customize your ranger'));
-  if (onboarding) wrap.appendChild(el('div', { class: 'q-sub' }, 'Pick your suit, helmet, and emblem to start. Level up to unlock chest shields, weapons, capes, guardian beasts, and power-ups.'));
-  const preview = el('div', { class: 'avatar-wrap avatar-preview', html: avatarSVG(q.avatar) });
+  if (onboarding) wrap.appendChild(el('div', { class: 'q-sub' }, art
+    ? 'Pick your suit and trim colors to start. Level up to unlock the sword, guardian beast, and power-ups.'
+    : 'Pick your suit, helmet, and emblem to start. Level up to unlock chest shields, weapons, capes, guardian beasts, and power-ups.'));
+  const preview = el('div', { class: 'avatar-wrap avatar-preview' + (art ? ' art-wrap' : ''), html: avatarHTML(q.avatar) });
   wrap.appendChild(preview);
-  wrap.appendChild(el('div', { class: 'chip-row chip-row-center' }, [
-    el('button', { class: 'chip' + (q.avatar.morphed ? ' chip-on' : ''), onclick: () => { q.avatar.morphed = true; saveState(); render(); } }, 'Helmet on'),
-    el('button', { class: 'chip' + (!q.avatar.morphed ? ' chip-on' : ''), onclick: () => { q.avatar.morphed = false; saveState(); render(); } }, 'Helmet off'),
-  ]));
-  wrap.appendChild(renderFaceControls(preview));
+  if (!art || ArtKit.has('rangerOff')) {
+    wrap.appendChild(el('div', { class: 'chip-row chip-row-center' }, [
+      el('button', { class: 'chip' + (q.avatar.morphed ? ' chip-on' : ''), onclick: () => { q.avatar.morphed = true; saveState(); render(); } }, 'Helmet on'),
+      el('button', { class: 'chip' + (!q.avatar.morphed ? ' chip-on' : ''), onclick: () => { q.avatar.morphed = false; saveState(); render(); } }, 'Helmet off'),
+    ]));
+  }
+  wrap.appendChild(renderArtImport());
+  if (!art) wrap.appendChild(renderFaceControls(preview));
 
-  CATALOG_SECTIONS.filter((s) => !onboarding || s.onboarding).forEach((sec) => {
+  customizerSections(onboarding).forEach((sec) => {
     wrap.appendChild(el('div', { class: 'q-custom-label' }, sec.label));
     wrap.appendChild(el('div', { class: 'chip-row' }, sec.items.map((item) => {
       const locked = item.lv > level;
@@ -814,6 +895,7 @@ function renderCustomizer(onboarding) {
 function qInit() {
   qEnsure();
   if (typeof Face !== 'undefined') Face.init(() => render());
+  if (typeof ArtKit !== 'undefined') ArtKit.init(() => render());
   const bar = document.getElementById('active-bar');
   if (bar) bar.addEventListener('click', () => { state.activeTab = 'quest'; saveState(); render(); });
   setInterval(qTick, 1000);

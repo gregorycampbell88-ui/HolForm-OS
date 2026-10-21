@@ -1,1 +1,4 @@
 .claude/
+
+# private local test copies of personal art (never commit)
+.test-art/
