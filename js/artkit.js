@@ -1,9 +1,20 @@
 // ============================================================
-// Art kit — your own ranger art, stored privately on THIS device.
-// Images are kept in the browser's IndexedDB (database "holform-art"),
-// never in synced state, never uploaded, never in the repo. Every device
-// imports its own copy; devices without it fall back to the drawn ranger.
+// Art kit — your own ranger art.
+// The six default pieces are built into the app (the art/ folder), so every
+// device shows them with no setup. A device can also override any piece with
+// its own file: overrides live in that browser's IndexedDB (database
+// "holform-art"), never in synced state and never uploaded. If a piece can't
+// load at all, the drawn pixel ranger is the fallback.
 // ============================================================
+
+const BUNDLED_ART = {
+  ranger: 'art/ranger.png',
+  rangerOff: 'art/ranger-off.png',
+  power: 'art/power.webp',
+  beast: 'art/beast.webp',
+  sword: 'art/sword.png',
+  morpher: 'art/morpher.png',
+};
 
 const ART_SLOTS = [
   { key: 'ranger', label: 'Ranger — helmet on', hint: 'Required' },
@@ -18,8 +29,23 @@ const ArtKit = (() => {
   const DB = 'holform-art';
   const STORE = 'images';
   const imgs = {};   // key -> decoded HTMLImageElement
-  const urls = {};   // key -> object URL of the original
+  const urls = {};   // key -> object URL (override) or built-in path
+  const bundled = {}; // key -> true while the built-in file is the one in use
   const recolorCache = {};
+
+  function loadBundled(key) {
+    return new Promise((resolve) => {
+      const im = new Image();
+      im.onload = () => { imgs[key] = im; urls[key] = BUNDLED_ART[key]; bundled[key] = true; resolve(true); };
+      im.onerror = () => resolve(false);
+      im.src = BUNDLED_ART[key];
+    });
+  }
+
+  function dropCurrent(key) {
+    if (urls[key] && !bundled[key]) URL.revokeObjectURL(urls[key]);
+    delete imgs[key]; delete urls[key]; delete bundled[key];
+  }
 
   function openDB() {
     return new Promise((resolve, reject) => {
@@ -93,13 +119,16 @@ const ArtKit = (() => {
           if (d) { imgs[key] = d.im; urls[key] = d.url; }
         }
         db.close();
-      } catch (e) { /* IndexedDB unavailable (private mode?) — drawn ranger is used */ }
+      } catch (e) { /* IndexedDB unavailable (private mode?) — built-in art still loads */ }
+      // built-in art fills in every piece that this device hasn't overridden
+      await Promise.all(Object.keys(BUNDLED_ART).filter((k) => !imgs[k]).map(loadBundled));
       this.ready = true;
       if (done) done();
     },
 
     has(key) { return !!imgs[key]; },
     url(key) { return urls[key] || ''; },
+    isBuiltIn(key) { return !!bundled[key]; },
 
     // art mode is on when this device has the ranger image and the player hasn't switched it off
     active(avatar) { return !!imgs.ranger && avatar.useArt !== false; },
@@ -117,7 +146,7 @@ const ArtKit = (() => {
         tx.onerror = () => reject(tx.error);
       });
       db.close();
-      if (urls[key]) URL.revokeObjectURL(urls[key]);
+      dropCurrent(key);
       imgs[key] = d.im; urls[key] = d.url;
       clearRecolor(key);
     },
@@ -131,9 +160,9 @@ const ArtKit = (() => {
         tx.onerror = () => reject(tx.error);
       });
       db.close();
-      if (urls[key]) URL.revokeObjectURL(urls[key]);
-      delete imgs[key]; delete urls[key];
+      dropCurrent(key);
       clearRecolor(key);
+      await loadBundled(key); // go back to the built-in piece
     },
 
     // Suit green -> chosen suit color, gold -> chosen trim color (shading kept).

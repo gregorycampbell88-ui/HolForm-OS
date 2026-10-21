@@ -414,7 +414,11 @@ function renderQuest() {
 
 // Your imported art (device-only) when present, otherwise the drawn pixel ranger.
 function artActive() { return typeof ArtKit !== 'undefined' && ArtKit.active(state.quest.avatar); }
-function avatarHTML(a) { return artActive() ? ArtKit.sceneHTML(a) : avatarSVG(a); }
+function avatarHTML(a) {
+  // hold an empty frame until the art finishes loading, so the drawn ranger doesn't flash
+  if (typeof ArtKit !== 'undefined' && !ArtKit.ready) return '<div class="art-scene" aria-hidden="true"></div>';
+  return artActive() ? ArtKit.sceneHTML(a) : avatarSVG(a);
+}
 
 function renderCharacterCard() {
   const q = state.quest;
@@ -833,8 +837,8 @@ function renderArtImport() {
     ...(questUI.artOpen || !ArtKit.has('ranger') ? { open: 'open' } : {}),
   });
   det.addEventListener('toggle', () => { questUI.artOpen = det.open; });
-  det.appendChild(el('summary', {}, ArtKit.has('ranger') ? 'Your art kit ✓' : 'Import your art kit'));
-  const msg = el('div', { class: 'q-sub q-dim' }, 'Private: images are saved only in this device’s browser storage — never uploaded, synced, or put on GitHub. Import them again on each device.');
+  det.appendChild(el('summary', {}, ArtKit.has('ranger') ? 'Your art kit ✓' : 'Art kit'));
+  const msg = el('div', { class: 'q-sub q-dim' }, 'Your art is built in and loads on every device. You can swap any piece below; a swap stays on this device only. × returns to the built-in piece.');
   det.appendChild(msg);
 
   ART_SLOTS.forEach((slot) => {
@@ -848,10 +852,13 @@ function renderArtImport() {
     });
     det.appendChild(el('div', { class: 'q-art-row' }, [
       ArtKit.has(slot.key) ? el('img', { class: 'q-art-thumb', src: ArtKit.url(slot.key), alt: '' }) : el('span', { class: 'q-art-thumb q-art-empty' }, '—'),
-      el('div', { class: 'q-art-name' }, [el('div', {}, slot.label), el('div', { class: 'q-dim' }, slot.hint)]),
+      el('div', { class: 'q-art-name' }, [
+        el('div', {}, slot.label),
+        el('div', { class: 'q-dim' }, ArtKit.has(slot.key) ? (ArtKit.isBuiltIn(slot.key) ? 'Built in' : 'Swapped on this device') : slot.hint),
+      ]),
       input,
-      el('button', { class: 'q-btn q-btn-small', onclick: () => input.click() }, ArtKit.has(slot.key) ? 'Replace' : 'Choose'),
-      ArtKit.has(slot.key) ? el('button', { class: 'q-btn q-btn-small q-btn-ghost', onclick: () => ArtKit.remove(slot.key).then(() => render()) }, '×') : null,
+      el('button', { class: 'q-btn q-btn-small', onclick: () => input.click() }, ArtKit.has(slot.key) ? 'Swap' : 'Choose'),
+      ArtKit.has(slot.key) && !ArtKit.isBuiltIn(slot.key) ? el('button', { class: 'q-btn q-btn-small q-btn-ghost', onclick: () => ArtKit.remove(slot.key).then(() => render()) }, '×') : null,
     ]));
   });
   if (ArtKit.has('ranger')) {
