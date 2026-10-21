@@ -19,6 +19,8 @@ const DEFAULT_STATE = {
   dayMeta: {},          // { [dateISO]: {groupKey, season} } — locks in which template a day used
   weeklyReflections: {}, // { [weekKey]: string }
   scheduleOverrides: {}, // { [groupKey]: {anchorMinutes, items:[{id,label,category,accent,durationMin}]} }
+  quest: {},             // character, XP, missions, gaming sessions — shape lives in js/quests.js
+  weeklyAdjustments: {}, // { [weekKey]: string } — the one adjustment chosen at the Sunday review
 };
 
 let state = loadState();
@@ -176,6 +178,7 @@ function render() {
   if (state.activeTab === 'today') renderToday();
   else if (state.activeTab === 'tasks') renderTasks();
   else if (state.activeTab === 'trends') renderTrends();
+  else if (state.activeTab === 'quest') renderQuest();
   else renderDashboard();
   document.querySelectorAll('.tab-btn').forEach(b => {
     b.classList.toggle('active', b.dataset.tab === state.activeTab);
@@ -183,6 +186,8 @@ function render() {
   document.getElementById('view-today').classList.toggle('hidden', state.activeTab !== 'today');
   document.getElementById('view-tasks').classList.toggle('hidden', state.activeTab !== 'tasks');
   document.getElementById('view-trends').classList.toggle('hidden', state.activeTab !== 'trends');
+  document.getElementById('view-quest').classList.toggle('hidden', state.activeTab !== 'quest');
+  if (window.Quest) qUpdateActiveBar();
   document.getElementById('view-dashboard').classList.toggle('hidden', state.activeTab !== 'dashboard');
 }
 
@@ -329,6 +334,7 @@ function toggleCheck(idx, val) {
   const day = state.selectedDate;
   if (!state.checks[day]) state.checks[day] = {};
   state.checks[day][idx] = val;
+  if (window.Quest) Quest.onBlockChecked(idx, val, day);
   saveState();
   render();
 }
@@ -663,7 +669,11 @@ function renderTaskColumn(title, list) {
       el('input', {
         type: 'checkbox', class: 'block-check',
         ...(task.checked ? { checked: 'checked' } : {}),
-        onchange: (e) => { task.checked = e.target.checked; saveState(); render(); },
+        onchange: (e) => {
+          task.checked = e.target.checked;
+          if (task.checked && window.Quest) Quest.onTaskChecked(task);
+          saveState(); render();
+        },
       }),
       el('span', { class: 'task-text' }, task.text),
       el('button', {
@@ -718,7 +728,18 @@ function computeWeekStats(weekDates) {
   const completedTasks = allTasks.filter((t) => t.checked).length;
   const stuckTasks = allTasks.filter((t) => !t.checked && (t.carriedCount || 0) >= 2);
 
-  return { days, leaderboard, totalTasks, completedTasks, stuckTasks };
+  const log = ((state.quest && state.quest.log) || []).filter((l) => weekDates.includes(l.date));
+  const finished = log.filter((l) => l.status === 'finished');
+  const missions = {
+    started: log.length,
+    finished: finished.length,
+    saved: log.filter((l) => l.status === 'saved').length,
+    editExtended: log.filter((l) => l.missionId === 'edit' && l.extensions > 0).length,
+    convoActions: finished.filter((l) => l.kind === 'convo').length,
+    replies: finished.filter((l) => l.kind === 'convo' && l.reply === true).length,
+  };
+
+  return { days, leaderboard, totalTasks, completedTasks, stuckTasks, missions };
 }
 
 function renderTrends() {
@@ -747,8 +768,10 @@ function renderTrends() {
 
   container.appendChild(renderDayCompletionRow(stats));
   container.appendChild(renderSkippedBlocks(stats));
+  container.appendChild(renderMissionStats(stats));
   container.appendChild(renderStuckTasks(stats));
   container.appendChild(renderReflectionBox(trendsWeekKey));
+  container.appendChild(renderAdjustmentBox(trendsWeekKey));
 
   container.appendChild(el('div', { class: 'trend-hint' },
     'Notice something that needs to change? Tell your assistant and it’ll update your schedule.'));
@@ -780,9 +803,12 @@ function renderDayCompletionRow(stats) {
 }
 
 function renderSkippedBlocks(stats) {
-  const wrap = el('div', { class: 'trend-section' }, [el('h3', {}, 'Most Skipped This Week')]);
+  const wrap = el('div', { class: 'trend-section' }, [
+    el('h3', {}, 'Not Checked Off This Week'),
+    el('p', { class: 'trend-sub' }, 'Unrecorded isn’t the same as avoided — look for patterns, not blame.'),
+  ]);
   if (!stats.leaderboard.length) {
-    wrap.appendChild(el('p', { class: 'trend-empty' }, 'Nothing skipped yet this week.'));
+    wrap.appendChild(el('p', { class: 'trend-empty' }, 'Everything so far is checked off.'));
     return wrap;
   }
   const list = el('div', { class: 'skip-list' });
@@ -796,14 +822,49 @@ function renderSkippedBlocks(stats) {
   return wrap;
 }
 
+function renderMissionStats(stats) {
+  const m = stats.missions;
+  const wrap = el('div', { class: 'trend-section' }, [el('h3', {}, 'Missions')]);
+  const rows = [
+    ['Started', m.started],
+    ['Finished', m.finished],
+    ['Saved for later', m.saved],
+    ['Edits that needed an extension', m.editExtended],
+    ['Conversation actions', m.convoActions],
+    ['Replies you recorded', m.replies],
+  ];
+  const list = el('div', { class: 'skip-list' });
+  rows.forEach(([label, n]) => {
+    list.appendChild(el('div', { class: 'skip-row' }, [
+      el('span', {}, label),
+      el('span', { class: 'stat-num' }, String(n)),
+    ]));
+  });
+  wrap.appendChild(list);
+  return wrap;
+}
+
+function renderAdjustmentBox(weekKey) {
+  const wrap = el('div', { class: 'trend-section' }, [
+    el('h3', {}, 'One adjustment for next week'),
+    el('p', { class: 'trend-sub' }, 'Just one. Small and specific beats a full reset.'),
+  ]);
+  wrap.appendChild(el('input', {
+    type: 'text', class: 'text-input', placeholder: 'e.g. Start the business block with a conversation',
+    value: state.weeklyAdjustments[weekKey] || '',
+    oninput: (e) => { state.weeklyAdjustments[weekKey] = e.target.value; saveState(); },
+  }));
+  return wrap;
+}
+
 function renderStuckTasks(stats) {
   const wrap = el('div', { class: 'trend-section' }, [
     el('h3', {}, 'Tasks'),
-    el('p', { class: 'trend-sub' }, `${stats.completedTasks} of ${stats.totalTasks} completed`),
+    el('p', { class: 'trend-sub' }, `${stats.completedTasks} of ${stats.totalTasks} checked off`),
   ]);
   if (stats.stuckTasks.length) {
     wrap.appendChild(el('div', { class: 'stuck-callout' }, [
-      el('strong', {}, 'Possibly stuck — carried 2+ days:'),
+      el('strong', {}, 'Carried forward 2+ days — unfinished or unrecorded:'),
       el('ul', {}, stats.stuckTasks.map((t) => el('li', {}, `${t.text} (${t.carriedCount}×)`))),
     ]));
   }
@@ -813,7 +874,7 @@ function renderStuckTasks(stats) {
 function renderReflectionBox(weekKey) {
   const wrap = el('div', { class: 'trend-section reflection-box' }, [
     el('h3', {}, 'Sunday Reflection'),
-    el('p', { class: 'trend-sub' }, 'What’s working? What’s not? What needs to change?'),
+    el('p', { class: 'trend-sub' }, 'What helped? What got in the way? What will I change?'),
   ]);
   const textarea = el('textarea', {
     class: 'reflection-textarea',
@@ -897,16 +958,30 @@ function init() {
     Notification.requestPermission().catch(() => {});
   }
   if (window.HolformSync) window.HolformSync.init(onRemoteState);
+  if (window.Quest) Quest.ensure();
   rolloverDailyTasks();
+  applyHashTab();
+  window.addEventListener('hashchange', () => { applyHashTab(); render(); });
   render();
+  if (window.Quest) Quest.init();
   setInterval(() => {
     rolloverDailyTasks();
     if (state.activeTab === 'today' || state.activeTab === 'tasks') render();
   }, 60000);
 }
 
+// Calendar links open the app at #quest / #trends etc.
+function applyHashTab() {
+  const tab = location.hash.replace('#', '');
+  if (['today', 'tasks', 'trends', 'quest', 'dashboard'].includes(tab)) {
+    state.activeTab = tab;
+    history.replaceState(null, '', location.pathname + location.search);
+  }
+}
+
 function onRemoteState(remote) {
   state = Object.assign(structuredClone(DEFAULT_STATE), remote);
+  if (window.Quest) Quest.ensure();
   localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
   rolloverDailyTasks();
   render();

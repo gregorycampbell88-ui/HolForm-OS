@@ -26,13 +26,16 @@
     <div class="tab-row">
       <button class="tab-btn active" data-tab="today">Today</button>
       <button class="tab-btn" data-tab="tasks">Tasks</button>
+      <button class="tab-btn" data-tab="quest">Quest</button>
       <button class="tab-btn" data-tab="trends">Trends</button>
       <button class="tab-btn" data-tab="dashboard">Activation</button>
     </div>
+    <div id="active-bar" class="active-bar hidden"></div>
   </header>
   <main>
     <div id="view-today"></div>
     <div id="view-tasks" class="hidden"></div>
+    <div id="view-quest" class="hidden"></div>
     <div id="view-trends" class="hidden"></div>
     <div id="view-dashboard" class="hidden"></div>
   </main>
@@ -46,6 +49,7 @@
 <script src="js/data.js"></script>
 <script src="js/sync.js"></script>
 <script src="js/app.js"></script>
+<script src="js/quests.js"></script>
 <script>
 if ('serviceWorker' in navigator) {
   let reloaded = false;

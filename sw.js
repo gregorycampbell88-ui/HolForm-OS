@@ -1,10 +1,11 @@
-const CACHE = 'holform-os-v7';
+const CACHE = 'holform-os-v8';
 const ASSETS = [
   './',
   './index.html',
   './css/styles.css',
   './js/data.js',
   './js/app.js',
+  './js/quests.js',
   './js/sync.js',
   './js/firebase-config.js',
   './manifest.json',
