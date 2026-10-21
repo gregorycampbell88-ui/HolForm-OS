@@ -1,10 +1,11 @@
-const CACHE = 'holform-os-v11';
+const CACHE = 'holform-os-v12';
 const ASSETS = [
   './',
   './index.html',
   './css/styles.css',
   './js/data.js',
   './js/app.js',
+  './js/face.js',
   './js/avatar.js',
   './js/quests.js',
   './js/sync.js',

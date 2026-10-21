@@ -849,3 +849,8 @@ main {
 @media (prefers-reduced-motion: reduce) { .flame { animation: none; } }
 
 .avatar-pixel { image-rendering: pixelated; border: 2px solid var(--charcoal-2); border-radius: 6px; }
+
+.q-face { margin-top: 4px; }
+.q-slider { display: flex; align-items: center; gap: 10px; font-size: 0.78rem; color: var(--light-gray); margin: 6px 0; }
+.q-slider span { width: 84px; flex: none; }
+.q-slider input[type="range"] { flex: 1; accent-color: var(--green); }

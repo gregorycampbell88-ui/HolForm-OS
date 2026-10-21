@@ -379,6 +379,9 @@ function avatarSVG(a) {
   const INK = '#0b0e10';
   const DARK = '#0e1113';
   const morphed = a.morphed !== false;
+  // Device-only photo face (helmet off). Falls back to the drawn face if this
+  // device has no photo.
+  const photo = !morphed && a.facePhoto && typeof Face !== 'undefined' ? Face.pixels() : null;
 
   const hero = new PX();
   const layer = (draw, bevelPair) => {
@@ -422,7 +425,7 @@ function avatarSVG(a) {
   const hairD = shade(hair, -0.3);
   const hairL = shade(hair, 0.22);
   const ch = CHARS.find((c) => c.id === a.base) || CHARS[0];
-  if (!morphed) {
+  if (!morphed && !photo) {
     if (a.hairStyle === 'long') layer((t) => t.poly([[11, 16], [10, 28], [11.5, 38], [28.5, 38], [30, 28], [29, 16], [27, 6], [13, 6]], hair));
     if (a.hairStyle === 'spiky') layer((t) => t.poly([[12, 14], [10, 8], [15, 11], [17, 4], [20, 10], [23, 4], [25, 11], [30, 8], [28, 14]], hair));
     if (a.hairStyle === 'bun') layer((t) => t.ellipse(20, 6, 3.4, 3.4, hair));
@@ -431,7 +434,7 @@ function avatarSVG(a) {
   // ---- body ----
   layer((t) => t.poly([[3, 48], [3, 41], [7, 36], [13, 32.5], [20, 31.5], [27, 32.5], [33, 36], [37, 41], [37, 48]], suit), [suitL, suitD]);
   layer((t) => t.mpoly([[3, 48], [3, 42], [6, 37.5], [9, 35], [14, 48]], WHITE), [WHITE, WHITE_D]);
-  layer((t) => t.rect(17, 27, 6, 6, morphed ? suitD : skinD));
+  layer((t) => t.rect(17, 27, 6, 6, morphed ? suitD : (photo ? shade(Face.skinTone(), -0.12) : skinD)));
   layer((t) => t.poly([[15.5, 31.5], [17.5, 29.5], [22.5, 29.5], [24.5, 31.5], [25.5, 36], [14.5, 36]], WHITE), [WHITE, WHITE_D]);
 
   // ---- chest armor ----
@@ -510,6 +513,17 @@ function avatarSVG(a) {
         layer((t) => t.poly([[20, 5.5], [24, 11.5], [20, 9.8], [16, 11.5]], trim), [trimL, trimD]);
         hero.set(19, 12, suitL); hero.set(20, 12, suitL);
     }
+  } else if (photo) {
+    // your photo, pixelated and clipped to a head shape
+    layer((t) => {
+      for (let j = 0; j < photo.h; j++) {
+        for (let i = 0; i < photo.w; i++) {
+          const x = 12 + i, y = 8 + j;
+          const dx = (x + 0.5 - 20) / 8, dy = (y + 0.5 - 18) / 10;
+          if (dx * dx + dy * dy <= 1) t.set(x, y, photo.px[j * photo.w + i]);
+        }
+      }
+    });
   } else {
     // unmasked face
     layer((t) => { t.rect(11, 17, 2, 4, skin); t.rect(27, 17, 2, 4, skin); });

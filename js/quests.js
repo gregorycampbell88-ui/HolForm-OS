@@ -58,7 +58,7 @@ const questUI = {
 // reset so the player re-picks a ranger; XP and missions are kept.
 function qDefaultAvatar() {
   return {
-    v: 2, chosen: false, morphed: true,
+    v: 2, chosen: false, morphed: true, facePhoto: false,
     suit: 'emerald', trim: 'gold', helmet: 'sentinel', emblem: 'tiger',
     chest: 'standard', weapon: 'none', cape: 'none', beast: 'none', aura: 'none', background: 'plain',
     base: 'kai', skin: 's3', hairStyle: 'short', hairColor: 'black',
@@ -715,17 +715,76 @@ function renderRecentLog() {
 
 // ---- customizer / onboarding ----
 
+// Private, on-device face photo (see js/face.js). Nothing here touches synced state
+// except the harmless `facePhoto` on/off flag.
+function renderFaceControls(preview) {
+  const q = state.quest;
+  const box = el('div', { class: 'q-face' });
+  box.appendChild(el('div', { class: 'q-custom-label' }, 'Your face (helmet off) — private'));
+
+  const refresh = () => { preview.innerHTML = avatarSVG(q.avatar); };
+  const msg = el('div', { class: 'q-sub q-dim' }, 'Photos are turned into pixel art on this device. Nothing is uploaded or synced; add it again on any other device.');
+
+  const fileInput = el('input', {
+    type: 'file', accept: 'image/*', class: 'hidden',
+    onchange: (e) => {
+      const f = e.target.files && e.target.files[0];
+      if (!f) return;
+      Face.setFromFile(f).then(() => {
+        q.avatar.facePhoto = true;
+        q.avatar.morphed = false;
+        saveState();
+        render();
+      }).catch((err) => { msg.textContent = err.message; msg.classList.remove('q-dim'); });
+    },
+  });
+  box.appendChild(fileInput);
+
+  const row = el('div', { class: 'chip-row' });
+  row.appendChild(el('button', { class: 'chip', onclick: () => fileInput.click() }, Face.has() ? 'Replace photo' : 'Upload headshot'));
+  if (Face.has()) {
+    row.appendChild(el('button', {
+      class: 'chip' + (q.avatar.facePhoto ? ' chip-on' : ''),
+      onclick: () => { q.avatar.facePhoto = !q.avatar.facePhoto; if (q.avatar.facePhoto) q.avatar.morphed = false; saveState(); render(); },
+    }, q.avatar.facePhoto ? 'Using my photo' : 'Use my photo'));
+    row.appendChild(el('button', {
+      class: 'chip',
+      onclick: () => { Face.clear(); q.avatar.facePhoto = false; saveState(); render(); },
+    }, 'Remove photo'));
+  }
+  box.appendChild(row);
+
+  if (Face.has()) {
+    const cur = Face.get();
+    const slider = (label, key, min, max, step) => el('label', { class: 'q-slider' }, [
+      el('span', {}, label),
+      el('input', {
+        type: 'range', min: String(min), max: String(max), step: String(step), value: String(cur[key]),
+        oninput: (e) => { Face.adjust({ [key]: Number(e.target.value) }); refresh(); },
+        onchange: () => { Face.save(); },
+      }),
+    ]);
+    box.appendChild(slider('Zoom', 'zoom', 1, 2.5, 0.05));
+    box.appendChild(slider('Left / right', 'ox', -1, 1, 0.05));
+    box.appendChild(slider('Up / down', 'oy', -1, 1, 0.05));
+  }
+  box.appendChild(msg);
+  return box;
+}
+
 function renderCustomizer(onboarding) {
   const q = state.quest;
   const level = levelInfo(q.xp).level;
   const wrap = el('div', { class: 'q-customizer' });
   wrap.appendChild(el('div', { class: 'q-section-title' }, onboarding ? 'Build your ranger' : 'Customize your ranger'));
   if (onboarding) wrap.appendChild(el('div', { class: 'q-sub' }, 'Pick your suit, helmet, and emblem to start. Level up to unlock chest shields, weapons, capes, guardian beasts, and power-ups.'));
-  wrap.appendChild(el('div', { class: 'avatar-wrap avatar-preview', html: avatarSVG(q.avatar) }));
+  const preview = el('div', { class: 'avatar-wrap avatar-preview', html: avatarSVG(q.avatar) });
+  wrap.appendChild(preview);
   wrap.appendChild(el('div', { class: 'chip-row chip-row-center' }, [
     el('button', { class: 'chip' + (q.avatar.morphed ? ' chip-on' : ''), onclick: () => { q.avatar.morphed = true; saveState(); render(); } }, 'Helmet on'),
     el('button', { class: 'chip' + (!q.avatar.morphed ? ' chip-on' : ''), onclick: () => { q.avatar.morphed = false; saveState(); render(); } }, 'Helmet off'),
   ]));
+  wrap.appendChild(renderFaceControls(preview));
 
   CATALOG_SECTIONS.filter((s) => !onboarding || s.onboarding).forEach((sec) => {
     wrap.appendChild(el('div', { class: 'q-custom-label' }, sec.label));
@@ -754,6 +813,7 @@ function renderCustomizer(onboarding) {
 
 function qInit() {
   qEnsure();
+  if (typeof Face !== 'undefined') Face.init(() => render());
   const bar = document.getElementById('active-bar');
   if (bar) bar.addEventListener('click', () => { state.activeTab = 'quest'; saveState(); render(); });
   setInterval(qTick, 1000);
