@@ -847,3 +847,5 @@ main {
 .flame { animation: flameFlicker 1.4s ease-in-out infinite alternate; transform-box: fill-box; transform-origin: 50% 100%; }
 @keyframes flameFlicker { from { opacity: 0.85; } to { opacity: 1; } }
 @media (prefers-reduced-motion: reduce) { .flame { animation: none; } }
+
+.avatar-pixel { image-rendering: pixelated; border: 2px solid var(--charcoal-2); border-radius: 6px; }

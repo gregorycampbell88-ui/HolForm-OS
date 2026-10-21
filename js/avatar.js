@@ -118,7 +118,13 @@ const CATALOG_SECTIONS = [
   { key: 'background', label: 'Background', items: BACKGROUNDS },
 ];
 
-// ---- drawing helpers ----
+
+// ---- pixel engine ----
+// The hero is drawn on a 40x48 pixel grid and emitted as crisp SVG rects.
+// Colors may carry an opacity as "#rrggbb@0.4".
+
+const GW = 40;
+const GH = 48;
 
 function shade(hex, amt) {
   const n = parseInt(hex.slice(1), 16);
@@ -131,297 +137,421 @@ function shade(hex, amt) {
   return '#' + ((1 << 24) + (r << 16) + (g << 8) + b).toString(16).slice(1);
 }
 
-const SHOULDERS = 'M24 240 C24 190 56 168 100 168 C144 168 176 190 176 240 Z';
-const FACE = 'M60 100 C60 70 80 58 100 58 C120 58 140 70 140 100 C140 128 124 152 100 152 C76 152 60 128 60 100 Z';
-const CAP = 'M56 104 C48 64 72 40 100 40 C128 40 152 64 144 104 C140 92 134 82 124 76 C116 84 104 82 98 72 C90 82 76 84 68 78 C62 84 58 94 56 104 Z';
-const MIRROR = 'translate(200 0) scale(-1 1)';
-
-function emblemSVG(kind, cx, cy, scale, color, dark) {
-  let inner;
-  if (kind === 'hawk') {
-    inner = `<path d="M-15 -5 L0 -13 L15 -5 L9 6 L0 15 L-9 6 Z" fill="${color}"/><path d="M-5 -2 L0 -6 L5 -2 L0 8 Z" fill="${dark}"/>`;
-  } else if (kind === 'wolf') {
-    inner = `<path d="M-13 -11 L-6 -4 L6 -4 L13 -11 L11 6 L0 15 L-11 6 Z" fill="${color}"/><circle cx="-4.5" cy="1" r="1.8" fill="${dark}"/><circle cx="4.5" cy="1" r="1.8" fill="${dark}"/><path d="M-2 8 L2 8 L0 11 Z" fill="${dark}"/>`;
-  } else {
-    inner = `<circle cx="-9" cy="-9" r="4.5" fill="${color}"/><circle cx="9" cy="-9" r="4.5" fill="${color}"/><circle r="13" fill="${color}"/><path d="M-9 -4 L-4 -1 M9 -4 L4 -1 M0 -12 L0 -7" stroke="${dark}" stroke-width="2" stroke-linecap="round"/><circle cx="-5" cy="1" r="1.8" fill="${dark}"/><circle cx="5" cy="1" r="1.8" fill="${dark}"/><path d="M-3 7 L3 7 L0 10 Z" fill="${dark}"/>`;
+function inPoly(x, y, pts) {
+  let inside = false;
+  for (let i = 0, j = pts.length - 1; i < pts.length; j = i++) {
+    const xi = pts[i][0], yi = pts[i][1], xj = pts[j][0], yj = pts[j][1];
+    if ((yi > y) !== (yj > y) && x < ((xj - xi) * (y - yi)) / (yj - yi) + xi) inside = !inside;
   }
-  return `<g transform="translate(${cx} ${cy}) scale(${scale})">${inner}</g>`;
+  return inside;
 }
 
-function bladeSVG(trim, trimD) {
-  return `<polygon points="0,0 7,26 7,166 -7,166 -7,26" fill="#d9e8ee" stroke="#8fa9b4" stroke-width="1.5"/>` +
-    `<path d="M0 8 L0 160" stroke="#8fa9b4" stroke-width="2"/>` +
-    `<rect x="-18" y="166" width="36" height="8" rx="3" fill="${trim}"/>` +
-    `<rect x="-4" y="174" width="8" height="28" rx="3" fill="${trimD}"/><circle cx="0" cy="206" r="5" fill="${trim}"/>`;
+class PX {
+  constructor() { this.c = new Array(GW * GH).fill(null); }
+  get(x, y) { return x < 0 || y < 0 || x >= GW || y >= GH ? null : this.c[y * GW + x]; }
+  set(x, y, col) { if (x >= 0 && y >= 0 && x < GW && y < GH) this.c[y * GW + x] = col; }
+  rect(x, y, w, h, col) { for (let j = 0; j < h; j++) for (let i = 0; i < w; i++) this.set(x + i, y + j, col); }
+  ellipse(cx, cy, rx, ry, col) {
+    for (let y = Math.floor(cy - ry); y <= Math.ceil(cy + ry); y++) {
+      for (let x = Math.floor(cx - rx); x <= Math.ceil(cx + rx); x++) {
+        const dx = (x + 0.5 - cx) / rx, dy = (y + 0.5 - cy) / ry;
+        if (dx * dx + dy * dy <= 1) this.set(x, y, col);
+      }
+    }
+  }
+  poly(pts, col) {
+    let minX = Infinity, maxX = -Infinity, minY = Infinity, maxY = -Infinity;
+    pts.forEach((p) => { minX = Math.min(minX, p[0]); maxX = Math.max(maxX, p[0]); minY = Math.min(minY, p[1]); maxY = Math.max(maxY, p[1]); });
+    for (let y = Math.floor(minY); y <= Math.ceil(maxY); y++) {
+      for (let x = Math.floor(minX); x <= Math.ceil(maxX); x++) {
+        if (inPoly(x + 0.5, y + 0.5, pts)) this.set(x, y, col);
+      }
+    }
+  }
+  mpoly(pts, col) { this.poly(pts, col); this.poly(pts.map((p) => [GW - p[0], p[1]]), col); }
+  line(x0, y0, x1, y1, col, th = 1) {
+    x0 = Math.round(x0); y0 = Math.round(y0); x1 = Math.round(x1); y1 = Math.round(y1);
+    const dx = Math.abs(x1 - x0), sx = x0 < x1 ? 1 : -1, dy = -Math.abs(y1 - y0), sy = y0 < y1 ? 1 : -1;
+    let err = dx + dy;
+    for (;;) {
+      for (let t = 0; t < th; t++) this.set(x0 + t, y0, col);
+      if (x0 === x1 && y0 === y1) break;
+      const e2 = 2 * err;
+      if (e2 >= dy) { err += dy; x0 += sx; }
+      if (e2 <= dx) { err += dx; y0 += sy; }
+    }
+  }
+  sprite(rows, ox, oy, pal) {
+    rows.forEach((r, j) => [...r].forEach((ch, i) => { if (ch !== '.' && pal[ch]) this.set(ox + i, oy + j, pal[ch]); }));
+  }
+  paste(src) { src.c.forEach((v, i) => { if (v) this.c[i] = v; }); }
+  // light on the top/left rim, dark on the bottom/right rim
+  bevel(light, dark) {
+    const snap = this.c.slice();
+    const g = (x, y) => (x < 0 || y < 0 || x >= GW || y >= GH ? null : snap[y * GW + x]);
+    for (let y = 0; y < GH; y++) {
+      for (let x = 0; x < GW; x++) {
+        if (!snap[y * GW + x]) continue;
+        if (!g(x, y - 1) || !g(x - 1, y)) this.c[y * GW + x] = light;
+        else if (!g(x, y + 1) || !g(x + 1, y)) this.c[y * GW + x] = dark;
+      }
+    }
+  }
+  outline(col) {
+    const snap = this.c.slice();
+    const g = (x, y) => (x < 0 || y < 0 || x >= GW || y >= GH ? null : snap[y * GW + x]);
+    for (let y = 0; y < GH; y++) {
+      for (let x = 0; x < GW; x++) {
+        if (snap[y * GW + x]) continue;
+        if (g(x - 1, y) || g(x + 1, y) || g(x, y - 1) || g(x, y + 1)) this.c[y * GW + x] = col;
+      }
+    }
+  }
+  svg() {
+    let out = '';
+    for (let y = 0; y < GH; y++) {
+      let x = 0;
+      while (x < GW) {
+        const c = this.c[y * GW + x];
+        if (!c) { x++; continue; }
+        let e = x + 1;
+        while (e < GW && this.c[y * GW + e] === c) e++;
+        const parts = c.split('@');
+        out += `<rect x="${x}" y="${y}" width="${e - x}" height="1" fill="${parts[0]}"${parts[1] ? ` fill-opacity="${parts[1]}"` : ''}/>`;
+        x = e;
+      }
+    }
+    return out;
+  }
 }
 
-function flameSVG(x, y, s, rot, outer, inner) {
-  return `<g class="flame" transform="translate(${x} ${y}) rotate(${rot}) scale(${s})">` +
-    `<path d="M0 0 C-12 -14 -7 -28 0 -44 C5 -30 14 -24 11 -9 C9 -2 4 0 0 0 Z" fill="${outer}"/>` +
-    `<path d="M0 -2 C-6 -10 -3 -18 0 -28 C3 -19 8 -14 6 -6 C5 -2 2 -2 0 -2 Z" fill="${inner}"/></g>`;
+function translucent(buf, color, fillA, edgeA) {
+  const out = new PX();
+  for (let y = 0; y < GH; y++) {
+    for (let x = 0; x < GW; x++) {
+      if (!buf.get(x, y)) continue;
+      const edge = !buf.get(x - 1, y) || !buf.get(x + 1, y) || !buf.get(x, y - 1) || !buf.get(x, y + 1);
+      out.set(x, y, `${color}@${edge ? edgeA : fillA}`);
+    }
+  }
+  return out;
 }
+
+// ---- layers ----
+
+function pxBackground(id) {
+  const b = new PX();
+  const bands = (cols) => {
+    const h = GH / cols.length;
+    cols.forEach((c, i) => b.rect(0, Math.round(i * h), GW, Math.ceil(h) + 1, c));
+  };
+  switch (id) {
+    case 'sunrise':
+      bands(['#ffb870', '#f59a62', '#e97b57', '#d4604f', '#a8465a', '#6b3359', '#4a2850']);
+      b.ellipse(20, 36, 10, 10, '#ffe7a3');
+      b.ellipse(20, 36, 7.5, 7.5, '#fff3c4');
+      b.poly([[0, 41], [8, 38], [16, 41], [24, 39], [32, 41], [40, 38], [40, 48], [0, 48]], '#3a1d3f');
+      break;
+    case 'city':
+      bands(['#1c3b5a', '#17324d', '#122941', '#0e2035', '#0a1828']);
+      [[0, 30, 7, 18], [6, 26, 6, 22], [12, 32, 6, 16], [22, 28, 7, 20], [29, 24, 6, 24], [34, 31, 6, 17]]
+        .forEach((r) => b.rect(r[0], r[1], r[2], r[3], '#0b1520'));
+      [[2, 34], [4, 38], [8, 31], [9, 36], [24, 33], [26, 38], [31, 29], [33, 35], [36, 36], [36, 40]]
+        .forEach((w) => b.set(w[0], w[1], '#ffd36a'));
+      break;
+    case 'stars':
+      b.rect(0, 0, GW, GH, '#0a0e1c');
+      [[4, 6], [12, 3], [30, 5], [36, 12], [6, 18], [34, 20], [22, 2], [3, 30], [37, 32], [20, 8], [9, 11], [27, 14], [15, 24], [31, 40]]
+        .forEach((s, i) => { b.set(s[0], s[1], '#fff'); if (i % 3 === 0) { b.set(s[0] + 1, s[1], '#fff@0.5'); b.set(s[0] - 1, s[1], '#fff@0.5'); b.set(s[0], s[1] + 1, '#fff@0.5'); b.set(s[0], s[1] - 1, '#fff@0.5'); } });
+      break;
+    case 'forest':
+      bands(['#14473a', '#103d31', '#0d3228', '#0a281f']);
+      [[3, 26], [10, 20], [30, 22], [37, 28]].forEach((t) => {
+        b.poly([[t[0], t[1]], [t[0] - 5, t[1] + 14], [t[0] + 5, t[1] + 14]], '#0c2e25');
+        b.poly([[t[0], t[1] - 5], [t[0] - 4, t[1] + 6], [t[0] + 4, t[1] + 6]], '#0f3b2f');
+      });
+      break;
+    case 'arena':
+      b.rect(0, 0, GW, GH, '#140e24');
+      b.poly([[8, 0], [13, 0], [24, 48], [0, 48]], '#ffffff@0.07');
+      b.poly([[27, 0], [32, 0], [40, 48], [16, 48]], '#ffffff@0.07');
+      break;
+    default:
+      b.rect(0, 0, GW, GH, '#161c20');
+      for (let y = 0; y < GH; y++) for (let x = 0; x < GW; x++) if ((x * 13 + y * 7 + x * y) % 11 === 0) b.set(x, y, '#1a2126');
+  }
+  return b;
+}
+
+function pxBeast(kind, trim) {
+  if (!kind || kind === 'none') return null;
+  const s = new PX();
+  const X = '#000';
+  switch (kind) {
+    case 'tiger':
+      s.ellipse(20, 24, 19, 20, X); s.ellipse(5, 8, 5, 5, X); s.ellipse(35, 8, 5, 5, X);
+      break;
+    case 'hawk':
+      s.mpoly([[1, 33], [0, 14], [2, 8], [8, 5], [8, 13], [12, 10], [12, 17], [16, 15], [17, 27], [11, 30]], X);
+      break;
+    case 'wolf':
+      s.ellipse(20, 25, 18, 20, X);
+      s.mpoly([[7, 22], [4, 1], [17, 12]], X);
+      break;
+    case 'dragon':
+      s.mpoly([[19, 36], [6, 40], [8, 31], [1, 31], [5, 23], [0, 19], [10, 17], [10, 8], [19, 19]], X);
+      s.mpoly([[14, 11], [9, 9], [7, 3], [10, 3], [11, 7], [15, 9]], X);
+      s.poly([[18, 7], [20, 2], [22, 7]], X);
+      break;
+    default:
+      return null;
+  }
+  const out = translucent(s, trim, 0.2, 0.75);
+  if (kind === 'tiger') {
+    [[2, 21, 7, 22], [2, 26, 7, 27], [33, 22, 38, 21], [33, 27, 38, 26], [6, 9, 8, 11], [32, 11, 34, 9]]
+      .forEach((l) => out.line(l[0], l[1], l[2], l[3], `${trim}@0.65`));
+  }
+  return out;
+}
+
+function pxAura(kind, suit) {
+  if (!kind || kind === 'none') return null;
+  const p = new PX();
+  const glow = (color) => {
+    for (let y = 0; y < GH; y++) {
+      for (let x = 0; x < GW; x++) {
+        const d = Math.hypot(x + 0.5 - 20, y + 0.5 - 24);
+        if (d < 9 || d > 21.5) continue;
+        const a = d < 14 ? 0.4 : d < 18 ? 0.28 : ((x + y) % 2 === 0 ? 0.22 : null);
+        if (a) p.set(x, y, `${color}@${a}`);
+      }
+    }
+  };
+  const flame = (x, y, h, w, outer, inner) => {
+    p.poly([[x - w, y], [x - w * 0.6, y - h * 0.55], [x, y - h], [x + w * 0.6, y - h * 0.55], [x + w, y]], outer);
+    p.poly([[x - w * 0.5, y], [x - w * 0.3, y - h * 0.4], [x, y - h * 0.65], [x + w * 0.3, y - h * 0.4], [x + w * 0.5, y]], inner);
+  };
+  if (kind === 'glow') glow(suit);
+  if (kind === 'blaze') {
+    glow('#ffb020');
+    [[10, 20, 8, 2.6], [30, 20, 8, 2.6], [20, 9, 10, 3.2], [13, 12, 7, 2.3], [27, 12, 7, 2.3], [4, 36, 9, 2.6], [36, 36, 9, 2.6], [7, 28, 7, 2.2], [33, 28, 7, 2.2]]
+      .forEach((f, i) => flame(f[0], f[1], f[2], f[3], i % 2 ? '#ff8a1f' : '#ffb020', '#fff3b0'));
+  }
+  if (kind === 'bolt') {
+    glow('#3aa5d8');
+    const bolt = [[6, 11], [9, 17], [7, 18], [10, 24]];
+    const bolt2 = [[3, 22], [6, 26], [4, 27], [7, 31]];
+    [bolt, bolt2].forEach((pts) => {
+      for (let i = 0; i < pts.length - 1; i++) {
+        p.line(pts[i][0], pts[i][1], pts[i + 1][0], pts[i + 1][1], '#9be3ff');
+        p.line(GW - pts[i][0] - 1, pts[i][1], GW - pts[i + 1][0] - 1, pts[i + 1][1], '#9be3ff');
+      }
+    });
+  }
+  if (kind === 'legend') {
+    glow('#ffd54a');
+    for (let i = 0; i < 12; i++) {
+      const ang = (i * Math.PI) / 6;
+      p.line(20 + Math.cos(ang) * 15, 24 + Math.sin(ang) * 15, 20 + Math.cos(ang) * 24, 24 + Math.sin(ang) * 24, '#fff3b0@0.45');
+    }
+    [[6, 14], [34, 18], [9, 31], [32, 8], [4, 6]].forEach((s) => {
+      p.set(s[0], s[1], '#fff3b0'); p.set(s[0] - 1, s[1], '#fff3b0'); p.set(s[0] + 1, s[1], '#fff3b0'); p.set(s[0], s[1] - 1, '#fff3b0'); p.set(s[0], s[1] + 1, '#fff3b0');
+    });
+  }
+  return p;
+}
+
+const EMBLEM_SPRITES = {
+  tiger: ['c.cccc.c', 'cccccccc', 'cdccccdc', 'cccddccc', 'cccccccc', '.cdccdc.', '..cccc..', '........'],
+  hawk: ['c......c', 'cc....cc', 'ccc..ccc', 'cccddccc', '.cccccc.', '..cccc..', '...cc...', '........'],
+  wolf: ['cc....cc', 'ccc..ccc', 'cccccccc', 'cdccccdc', 'cccddccc', '.cccccc.', '..cddc..', '...cc...'],
+};
 
 function avatarSVG(a) {
   const suit = (SUITS.find((s) => s.id === a.suit) || SUITS[0]).color;
-  const suitD = shade(suit, -0.28);
-  const suitL = shade(suit, 0.25);
+  const suitD = shade(suit, -0.3);
+  const suitL = shade(suit, 0.3);
   const trim = (TRIMS.find((t) => t.id === a.trim) || TRIMS[0]).color;
-  const trimD = shade(trim, -0.35);
-  const dark = '#14181b';
-  const id = 'a' + Math.random().toString(36).slice(2, 8);
-  let defs = '';
-
-  // ---- background ----
-  let bg;
-  switch (a.background) {
-    case 'sunrise':
-      defs += `<linearGradient id="${id}-bg" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#ffb870"/><stop offset=".7" stop-color="#e4604f"/><stop offset="1" stop-color="#5a2d52"/></linearGradient>`;
-      bg = `<rect width="200" height="240" fill="url(#${id}-bg)"/><circle cx="100" cy="176" r="48" fill="#ffe7a3" opacity=".9"/><path d="M0 200 Q50 178 100 198 T200 190 L200 240 L0 240 Z" fill="#3a1d3f"/>`;
-      break;
-    case 'city': {
-      defs += `<linearGradient id="${id}-bg" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#1c3b5a"/><stop offset="1" stop-color="#0a121c"/></linearGradient>`;
-      const b = [[0, 150, 34, 90], [30, 128, 30, 112], [60, 160, 28, 80], [112, 140, 34, 100], [146, 118, 30, 122], [172, 152, 28, 88]];
-      bg = `<rect width="200" height="240" fill="url(#${id}-bg)"/>` +
-        b.map((r) => `<rect x="${r[0]}" y="${r[1]}" width="${r[2]}" height="${r[3]}" fill="#0b1520"/>`).join('') +
-        [[10, 164], [20, 180], [40, 146], [46, 170], [118, 156], [130, 176], [154, 136], [166, 160], [180, 172]]
-          .map((w) => `<rect x="${w[0]}" y="${w[1]}" width="5" height="5" fill="#ffd36a" opacity=".8"/>`).join('');
-      break;
-    }
-    case 'stars':
-      bg = `<rect width="200" height="240" fill="#0a0e1c"/>` +
-        [[20, 30, 1.6], [60, 18, 1.2], [150, 26, 1.8], [180, 60, 1.2], [30, 90, 1], [170, 100, 1.4], [110, 12, 1], [16, 150, 1.3], [184, 160, 1.1], [100, 40, .8], [46, 54, 1], [136, 70, 1]]
-          .map((s) => `<circle cx="${s[0]}" cy="${s[1]}" r="${s[2]}" fill="#fff"/>`).join('');
-      break;
-    case 'forest':
-      defs += `<linearGradient id="${id}-bg" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#14473a"/><stop offset="1" stop-color="#0a1f1a"/></linearGradient>`;
-      bg = `<rect width="200" height="240" fill="url(#${id}-bg)"/>` +
-        [[16, 130], [50, 100], [152, 110], [184, 140]].map((t) => `<polygon points="${t[0]},${t[1]} ${t[0] - 22},${t[1] + 70} ${t[0] + 22},${t[1] + 70}" fill="#0c2e25"/><polygon points="${t[0]},${t[1] - 24} ${t[0] - 17},${t[1] + 30} ${t[0] + 17},${t[1] + 30}" fill="#0f3b2f"/>`).join('');
-      break;
-    case 'arena':
-      bg = `<rect width="200" height="240" fill="#140e24"/><polygon points="40,0 64,0 112,240 0,240" fill="#fff" opacity=".06"/><polygon points="160,0 184,0 200,240 88,240" fill="#fff" opacity=".06"/>`;
-      break;
-    default:
-      bg = `<rect width="200" height="240" fill="#161c20"/>`;
-  }
-
-  // ---- guardian beast (big shape behind the hero) ----
-  let beast = '';
-  const bStyle = `fill="${trim}" fill-opacity=".2" stroke="${trim}" stroke-opacity=".75" stroke-width="2.2" stroke-linejoin="round"`;
-  switch (a.beast) {
-    case 'tiger':
-      beast = `<g ${bStyle}><circle cx="100" cy="120" r="94"/><circle cx="26" cy="42" r="24"/><circle cx="174" cy="42" r="24"/></g>` +
-        `<path d="M10 100 L40 110 M8 130 L38 136 M190 100 L160 110 M192 130 L162 136 M30 62 L40 74 M170 62 L160 74" stroke="${trim}" stroke-opacity=".7" stroke-width="5" stroke-linecap="round"/>`;
-      break;
-    case 'hawk': {
-      const wing = `<path d="M94 156 C60 146 20 114 -8 40 C22 54 40 50 52 36 C58 58 74 70 90 74 C82 90 94 106 102 116 Z" ${bStyle}/><path d="M30 70 L60 100 M18 52 L56 88" stroke="${trim}" stroke-opacity=".6" stroke-width="3"/>`;
-      beast = wing + `<g transform="${MIRROR}">${wing}</g>`;
-      break;
-    }
-    case 'wolf':
-      beast = `<g ${bStyle}><ellipse cx="100" cy="124" rx="92" ry="100"/><path d="M34 108 L20 4 L88 58 Z"/><path d="M166 108 L180 4 L112 58 Z"/></g>` +
-        `<path d="M6 170 L30 146 L22 182 M194 170 L170 146 L178 182" stroke="${trim}" stroke-opacity=".7" stroke-width="5" stroke-linecap="round" fill="none"/>`;
-      break;
-    case 'dragon': {
-      const wing = `<path d="M96 176 L28 196 L38 156 L8 154 L26 114 L0 96 L52 88 L50 40 L98 94 Z" ${bStyle}/>`;
-      const horn = `<path d="M72 54 C46 44 38 16 56 4 C52 24 66 38 84 46 Z" ${bStyle}/>`;
-      beast = wing + horn + `<g transform="${MIRROR}">${wing}${horn}</g>` +
-        `<path d="M92 34 L100 12 L108 34 Z" ${bStyle}/>`;
-      break;
-    }
-    default:
-      beast = '';
-  }
-
-  // ---- power-up (aura) ----
-  let aura = '';
-  const auraColor = { glow: suit, blaze: '#ffb020', bolt: '#3aa5d8', legend: '#ffd54a' }[a.aura];
-  if (auraColor) {
-    defs += `<radialGradient id="${id}-au" cx="50%" cy="50%" r="50%"><stop offset="0" stop-color="${auraColor}" stop-opacity=".75"/><stop offset=".6" stop-color="${auraColor}" stop-opacity=".35"/><stop offset="1" stop-color="${auraColor}" stop-opacity="0"/></radialGradient>`;
-    aura = `<circle class="aura-pulse" cx="100" cy="124" r="108" fill="url(#${id}-au)"/>`;
-    if (a.aura === 'blaze') {
-      aura += flameSVG(50, 96, 1.3, -18, '#ffb020', '#fff3b0') + flameSVG(150, 96, 1.3, 18, '#ffb020', '#fff3b0') +
-        flameSVG(100, 40, 1.5, 0, '#ffb020', '#fff3b0') + flameSVG(66, 52, 1.1, -26, '#ff8a1f', '#ffe27a') + flameSVG(134, 52, 1.1, 26, '#ff8a1f', '#ffe27a') +
-        flameSVG(22, 170, 1.2, -10, '#ff8a1f', '#ffe27a') + flameSVG(178, 170, 1.2, 10, '#ff8a1f', '#ffe27a') +
-        flameSVG(34, 128, 1, -22, '#ffd54a', '#fff6c8') + flameSVG(166, 128, 1, 22, '#ffd54a', '#fff6c8');
-    } else if (a.aura === 'bolt') {
-      const bolt = '<polyline points="30,56 44,84 32,88 48,120" stroke="#9be3ff" stroke-width="3" fill="none" stroke-linejoin="round"/><polyline points="18,110 30,128 22,132 34,154" stroke="#9be3ff" stroke-width="2.5" fill="none" stroke-linejoin="round"/>';
-      aura += bolt + `<g transform="${MIRROR}">${bolt}</g>`;
-    } else if (a.aura === 'legend') {
-      let rays = '';
-      for (let i = 0; i < 12; i++) rays += `<polygon points="100,124 95,-30 105,-30" fill="#fff3b0" opacity=".16" transform="rotate(${i * 30} 100 124)"/>`;
-      const spark = (x, y, s) => `<path transform="translate(${x} ${y}) scale(${s})" d="M0 -8 L2 -2 L8 0 L2 2 L0 8 L-2 2 L-8 0 L-2 -2 Z" fill="#fff3b0"/>`;
-      aura += rays + spark(30, 70, 1.2) + spark(172, 90, 1) + spark(44, 150, .8) + spark(160, 40, .9) + spark(22, 30, .7);
-    }
-  }
-
-  // ---- weapons ----
-  let weaponBack = '';
-  let weaponFront = '';
-  switch (a.weapon) {
-    case 'blade':
-      weaponBack = `<g transform="translate(168 28)">${bladeSVG(trim, trimD)}</g>`;
-      break;
-    case 'twin':
-      weaponBack = `<g transform="translate(100 236) rotate(-34) translate(0 -214)">${bladeSVG(trim, trimD)}</g>` +
-        `<g transform="translate(100 236) rotate(34) translate(0 -214)">${bladeSVG(trim, trimD)}</g>`;
-      break;
-    case 'staff':
-      weaponBack = `<rect x="24" y="22" width="7" height="220" rx="3" fill="${trim}" stroke="${trimD}" stroke-width="1.5"/><circle cx="27.5" cy="20" r="10" fill="${suitL}" stroke="${trim}" stroke-width="3.5"/>`;
-      break;
-    case 'blaster':
-      weaponFront = `<path d="M112 228 L168 228 L174 214 L158 208 L146 214 L112 214 Z" fill="#2a3138" stroke="${trim}" stroke-width="2.5" stroke-linejoin="round"/><rect x="118" y="218" width="34" height="5" rx="2" fill="${suitL}"/><circle cx="174" cy="214" r="4" fill="${suitL}"/>`;
-      break;
-    default:
-      break;
-  }
-
-  // ---- cape (behind the hero) ----
-  let cape = '';
-  if (a.cape === 'short' || a.cape === 'legend') {
-    const edge = a.cape === 'legend' ? ` stroke="${trim}" stroke-width="3"` : '';
-    const reach = a.cape === 'legend' ? 'M34 172 C4 196 -2 228 4 240 L74 240 L66 184 Z' : 'M34 176 C14 196 10 222 14 240 L72 240 L66 186 Z';
-    cape = `<path d="${reach}" fill="${suitD}"${edge}/><g transform="${MIRROR}"><path d="${reach}" fill="${suitD}"${edge}/></g>`;
-  }
-
+  const trimD = shade(trim, -0.38);
+  const trimL = shade(trim, 0.35);
+  const WHITE = '#eef2f4';
+  const WHITE_D = '#c3ccd1';
+  const INK = '#0b0e10';
+  const DARK = '#0e1113';
   const morphed = a.morphed !== false;
 
-  // ---- unmasked head (helmet off) ----
-  let hairBack = '';
-  let hairFront = '';
-  let headOff = '';
-  let neckSkin = '';
-  if (!morphed) {
-    const ch = CHARS.find((c) => c.id === a.base) || CHARS[0];
-    const skin = (SKINS.find((s) => s.id === a.skin) || SKINS[2]).color;
-    const skinD = shade(skin, -0.14);
-    const hair = (HAIR_COLORS.find((c) => c.id === a.hairColor) || HAIR_COLORS[0]).color;
-    const hairD = shade(hair, -0.25);
-    const hairL = shade(hair, 0.18);
-    switch (a.hairStyle) {
-      case 'swept':
-        hairFront = `<path d="M54 106 C44 62 76 38 108 40 C136 42 152 66 144 106 C140 90 130 78 114 72 C98 70 76 80 66 96 C62 100 58 104 54 106 Z" fill="${hair}"/><path d="M70 92 C84 70 112 64 136 74 C116 74 96 82 82 100 Z" fill="${hairL}"/>`;
-        break;
-      case 'long':
-        hairBack = `<path d="M52 98 C42 150 48 200 60 226 L140 226 C152 200 158 150 148 98 C140 60 60 60 52 98 Z" fill="${hair}"/>`;
-        hairFront = `<path d="M56 104 C48 64 72 40 100 40 C128 40 152 64 144 104 C138 92 126 78 100 70 C74 78 62 92 56 104 Z" fill="${hair}"/><path d="M62 96 C70 74 90 66 100 66" stroke="${hairL}" stroke-width="3" fill="none" stroke-linecap="round"/>`;
-        break;
-      case 'spiky':
-        hairBack = `<path d="M58 74 L48 42 L76 58 L84 26 L100 52 L116 24 L124 58 L152 40 L142 76 Z" fill="${hair}"/>`;
-        hairFront = `<path d="${CAP}" fill="${hair}"/>`;
-        break;
-      case 'bun':
-        hairBack = `<circle cx="100" cy="34" r="16" fill="${hair}"/>`;
-        hairFront = `<path d="${CAP}" fill="${hair}"/>`;
-        break;
-      default:
-        hairFront = `<path d="${CAP}" fill="${hair}"/><path d="M70 62 C80 52 96 48 110 50" stroke="${hairL}" stroke-width="3" fill="none" stroke-linecap="round"/>`;
-    }
-    neckSkin = `<rect x="88" y="140" width="24" height="36" rx="8" fill="${skinD}"/>`;
-    const t = ch.tilt;
-    const eyes = [82, 118].map((cx, i) => {
-      const flip = i === 0 ? 1 : -1;
-      const outer = cx - flip * 13;
-      return `<ellipse cx="${cx}" cy="112" rx="11" ry="13" fill="#fff"/>` +
-        `<ellipse cx="${cx}" cy="113" rx="${ch.iris[0]}" ry="${ch.iris[1]}" fill="${ch.eye}"/>` +
-        `<ellipse cx="${cx}" cy="114" rx="4.5" ry="6.5" fill="#14141a"/>` +
-        `<circle cx="${cx - 3}" cy="108" r="3" fill="#fff"/><circle cx="${cx + 3}" cy="118" r="1.5" fill="#fff" opacity=".9"/>` +
-        `<path d="M${outer} ${108 - t} Q${cx} 98 ${cx + flip * 12} 107" stroke="#14141a" stroke-width="3" fill="none" stroke-linecap="round"/>`;
-    }).join('');
-    headOff =
-      `<circle cx="58" cy="108" r="8" fill="${skin}"/><circle cx="142" cy="108" r="8" fill="${skin}"/>` +
-      `<circle cx="58" cy="108" r="4" fill="${skinD}"/><circle cx="142" cy="108" r="4" fill="${skinD}"/>` +
-      `<path d="${FACE}" fill="${skin}"/>` +
-      `<ellipse cx="72" cy="128" rx="8" ry="4" fill="#ff7a7a" opacity=".22"/><ellipse cx="128" cy="128" rx="8" ry="4" fill="#ff7a7a" opacity=".22"/>` +
-      eyes +
-      `<path d="M70 94 Q82 ${90 - t / 2} 93 93" stroke="${hairD}" stroke-width="3.2" fill="none" stroke-linecap="round"/>` +
-      `<path d="M107 93 Q118 ${90 - t / 2} 130 94" stroke="${hairD}" stroke-width="3.2" fill="none" stroke-linecap="round"/>` +
-      `<path d="M99 124 Q100 128 102 128" stroke="${skinD}" stroke-width="2" fill="none" stroke-linecap="round"/>` +
-      `<path d="M92 137 Q100 144 108 137" stroke="#7a3434" stroke-width="2.6" fill="none" stroke-linecap="round"/>`;
-    hairBack = `<g stroke="${shade(hair, 0.32)}" stroke-width="1.4" stroke-linejoin="round">${hairBack}</g>`;
-    hairFront = `<g stroke="${shade(hair, 0.32)}" stroke-width="1.4" stroke-linejoin="round">${hairFront}</g>`;
+  const hero = new PX();
+  const layer = (draw, bevelPair) => {
+    const t = new PX();
+    draw(t);
+    if (bevelPair) t.bevel(bevelPair[0], bevelPair[1]);
+    hero.paste(t);
+  };
+
+  // ---- weapons behind the hero ----
+  if (a.weapon === 'blade') {
+    layer((t) => {
+      t.rect(33, 4, 3, 33, '#d9e8ee'); t.rect(33, 4, 1, 33, '#aebfc7'); t.set(34, 3, '#d9e8ee'); t.rect(34, 6, 1, 28, '#f6fbfd');
+      t.rect(31, 37, 7, 2, trim); t.rect(31, 38, 7, 1, trimD);
+    });
+  } else if (a.weapon === 'twin') {
+    layer((t) => {
+      t.line(20, 46, 4, 3, '#d9e8ee', 3);
+      t.line(18, 46, 2, 3, '#aebfc7', 1);
+      t.line(18, 46, 34, 3, '#d9e8ee', 3);
+      t.line(22, 46, 38, 3, '#aebfc7', 1);
+    });
+  } else if (a.weapon === 'staff') {
+    layer((t) => {
+      t.rect(3, 4, 2, 44, trim); t.rect(3, 4, 1, 44, trimL);
+      t.ellipse(4, 3.5, 3.4, 3.4, trim); t.ellipse(4, 3.5, 2.2, 2.2, suitL);
+    });
   }
 
-  // ---- suit body ----
-  const body =
-    `<path d="${SHOULDERS}" fill="${suit}"/>` +
-    `<path d="M24 240 C24 204 38 186 56 178 L72 240 Z" fill="#f2f5f6"/><g transform="${MIRROR}"><path d="M24 240 C24 204 38 186 56 178 L72 240 Z" fill="#f2f5f6"/></g>` +
-    (morphed ? `<rect x="86" y="142" width="28" height="36" rx="8" fill="${suitD}"/>` : neckSkin) +
-    `<path d="M80 168 L88 160 L112 160 L120 168 L124 182 L76 182 Z" fill="#f2f5f6"/>`;
+  // ---- cape ----
+  if (a.cape === 'short') {
+    layer((t) => t.mpoly([[8, 35], [4, 40], [3, 48], [12, 48], [11, 37]], suitD));
+  } else if (a.cape === 'legend') {
+    layer((t) => { t.mpoly([[8, 34], [2, 40], [0, 48], [13, 48], [11, 36]], trim); t.mpoly([[8, 35], [3, 40], [2, 47], [12, 47], [11, 37]], suitD); });
+  }
+
+  // ---- unmasked hair (back layer) ----
+  const skin = (SKINS.find((s) => s.id === a.skin) || SKINS[2]).color;
+  const skinD = shade(skin, -0.16);
+  const hair = (HAIR_COLORS.find((c) => c.id === a.hairColor) || HAIR_COLORS[0]).color;
+  const hairD = shade(hair, -0.3);
+  const hairL = shade(hair, 0.22);
+  const ch = CHARS.find((c) => c.id === a.base) || CHARS[0];
+  if (!morphed) {
+    if (a.hairStyle === 'long') layer((t) => t.poly([[11, 16], [10, 28], [11.5, 38], [28.5, 38], [30, 28], [29, 16], [27, 6], [13, 6]], hair));
+    if (a.hairStyle === 'spiky') layer((t) => t.poly([[12, 14], [10, 8], [15, 11], [17, 4], [20, 10], [23, 4], [25, 11], [30, 8], [28, 14]], hair));
+    if (a.hairStyle === 'bun') layer((t) => t.ellipse(20, 6, 3.4, 3.4, hair));
+  }
+
+  // ---- body ----
+  layer((t) => t.poly([[3, 48], [3, 41], [7, 36], [13, 32.5], [20, 31.5], [27, 32.5], [33, 36], [37, 41], [37, 48]], suit), [suitL, suitD]);
+  layer((t) => t.mpoly([[3, 48], [3, 42], [6, 37.5], [9, 35], [14, 48]], WHITE), [WHITE, WHITE_D]);
+  layer((t) => t.rect(17, 27, 6, 6, morphed ? suitD : skinD));
+  layer((t) => t.poly([[15.5, 31.5], [17.5, 29.5], [22.5, 29.5], [24.5, 31.5], [25.5, 36], [14.5, 36]], WHITE), [WHITE, WHITE_D]);
 
   // ---- chest armor ----
-  const emblem = (cx, cy, s) => emblemSVG(a.emblem, cx, cy, s, trim, dark);
-  const belt = `<rect x="30" y="228" width="140" height="12" fill="${trim}"/><circle cx="100" cy="234" r="8" fill="${trimD}" stroke="${trim}" stroke-width="2"/>`;
-  let chest;
+  const emblemSprite = EMBLEM_SPRITES[a.emblem] || EMBLEM_SPRITES.tiger;
+  const pal = { c: trim, d: DARK };
   switch (a.chest) {
     case 'guardian':
-      chest = `<path d="M22 196 C50 170 150 170 178 196 L150 240 L50 240 Z" fill="${trim}"/>` +
-        `<path d="M34 198 C58 180 142 180 166 198 L142 236 L58 236 Z" fill="${suit}"/>` +
-        `<circle cx="100" cy="210" r="25" fill="#0e1113" stroke="${trim}" stroke-width="3"/>${emblem(100, 210, 1.2)}`;
-      break;
-    case 'dragon': {
-      let rings = '';
-      for (let i = 0; i < 12; i++) rings += `<path d="M100 214 L${(100 + Math.cos(i * Math.PI / 6) * 44).toFixed(1)} ${(214 + Math.sin(i * Math.PI / 6) * 44).toFixed(1)}" stroke="${trimD}" stroke-width="1.5"/>`;
-      chest = `<circle cx="100" cy="216" r="48" fill="${trim}" stroke="${trimD}" stroke-width="3"/>` +
-        `<g transform="translate(0 2)">${rings}</g><circle cx="100" cy="216" r="36" fill="none" stroke="${trimD}" stroke-width="2"/>` +
-        `<circle cx="100" cy="216" r="22" fill="#0e1113" stroke="${trim}" stroke-width="3"/>${emblem(100, 216, 1.15)}`;
-      break;
-    }
     case 'titan':
-      chest = `<path d="M22 196 C50 170 150 170 178 196 L150 240 L50 240 Z" fill="${trim}"/>` +
-        `<path d="M34 198 C58 180 142 180 166 198 L142 236 L58 236 Z" fill="${suit}"/>` +
-        `<circle cx="100" cy="210" r="25" fill="#0e1113" stroke="${trim}" stroke-width="3"/>${emblem(100, 210, 1.2)}` +
-        `<ellipse cx="38" cy="192" rx="28" ry="16" fill="${trim}" stroke="${trimD}" stroke-width="2" transform="rotate(-22 38 192)"/>` +
-        `<ellipse cx="162" cy="192" rx="28" ry="16" fill="${trim}" stroke="${trimD}" stroke-width="2" transform="rotate(22 162 192)"/>` +
-        `<circle cx="38" cy="192" r="5" fill="${suitL}"/><circle cx="162" cy="192" r="5" fill="${suitL}"/>`;
+      layer((t) => t.poly([[3.5, 39.5], [9, 35], [20, 33.5], [31, 35], [36.5, 39.5], [30, 48], [10, 48]], trim), [trimL, trimD]);
+      layer((t) => t.poly([[6, 40], [10.5, 36.5], [20, 35.5], [29.5, 36.5], [34, 40], [28.5, 46.5], [11.5, 46.5]], suit), [suitL, suitD]);
+      layer((t) => { t.ellipse(20, 41, 6, 6, trim); t.ellipse(20, 41, 4.9, 4.9, DARK); t.sprite(emblemSprite, 16, 37, pal); });
+      if (a.chest === 'titan') {
+        layer((t) => { t.ellipse(7, 37, 5.6, 3.4, trim); t.ellipse(33, 37, 5.6, 3.4, trim); }, [trimL, trimD]);
+        hero.set(7, 37, suitL); hero.set(33, 37, suitL);
+      }
+      break;
+    case 'dragon':
+      layer((t) => t.ellipse(20, 44, 10.5, 10.5, trim), [trimL, trimD]);
+      layer((t) => { t.ellipse(20, 44, 7.6, 7.6, trimD); t.ellipse(20, 44, 6.6, 6.6, trim); t.ellipse(20, 44, 4.8, 4.8, DARK); t.sprite(emblemSprite, 16, 40, pal); });
+      [[20, 34], [13, 37], [27, 37], [10, 44], [30, 44]].forEach((s) => hero.set(s[0], s[1], trimD));
       break;
     default:
-      chest = `<path d="M76 182 L100 206 L124 182" fill="none" stroke="${trim}" stroke-width="4" stroke-linejoin="round"/>${emblem(100, 214, .95)}${belt}`;
+      layer((t) => { t.line(15, 36, 20, 41, trim); t.line(25, 36, 20, 41, trim); t.sprite(emblemSprite, 16, 38, pal); t.rect(6, 46, 28, 2, trim); t.rect(18, 46, 4, 2, trimD); });
   }
 
-  // ---- helmet (morphed) ----
-  let head = headOff;
+  // ---- helmet or face ----
   if (morphed) {
-    let crest;
+    // pieces that sit behind the shell
     switch (a.helmet) {
       case 'tiger':
-        crest = `<path d="M54 74 L56 26 L92 48 Z" fill="${suit}" stroke="${suit}" stroke-width="6" stroke-linejoin="round"/><path d="M62 62 L63 38 L82 50 Z" fill="${trim}"/>` +
-          `<path d="M146 74 L144 26 L108 48 Z" fill="${suit}" stroke="${suit}" stroke-width="6" stroke-linejoin="round"/><path d="M138 62 L137 38 L118 50 Z" fill="${trim}"/>` +
-          `<path d="M92 40 L92 56 M100 38 L100 58 M108 40 L108 56" stroke="${dark}" stroke-width="3" stroke-linecap="round"/>`;
+        layer((t) => { t.mpoly([[11, 13], [11, 4], [17, 8]], suit); t.mpoly([[12.4, 10.5], [12.4, 6.5], [15.4, 8.6]], trim); }, null);
         break;
       case 'hawk':
-        crest = `<path d="M54 96 L22 72 L38 112 L54 124 Z" fill="${trim}"/><path d="M146 96 L178 72 L162 112 L146 124 Z" fill="${trim}"/>` +
-          `<path d="M100 34 L110 58 L100 72 L90 58 Z" fill="${trim}"/>`;
+        layer((t) => t.mpoly([[11, 17], [3.5, 10.5], [8, 22.5], [11, 24]], trim), [trimL, trimD]);
         break;
       case 'wolf':
-        crest = `<path d="M62 62 L56 24 L88 44 Z" fill="${suit}" stroke="${trim}" stroke-width="2.5" stroke-linejoin="round"/><path d="M138 62 L144 24 L112 44 Z" fill="${suit}" stroke="${trim}" stroke-width="2.5" stroke-linejoin="round"/>` +
-          `<path d="M100 40 L108 60 L100 70 L92 60 Z" fill="${trim}"/>`;
+        layer((t) => { t.mpoly([[12, 13], [9.5, 2], [17.5, 8]], suit); t.mpoly([[12.6, 10.5], [11, 5], [15.4, 8.6]], trim); }, null);
         break;
       case 'dragon':
-        crest = `<path d="M66 54 C42 44 34 18 50 6 C48 24 62 36 80 44 Z" fill="${trim}"/><path d="M134 54 C158 44 166 18 150 6 C152 24 138 36 120 44 Z" fill="${trim}"/>` +
-          `<path d="M100 32 L108 54 L100 62 L92 54 Z" fill="${trim}"/>`;
+        layer((t) => t.mpoly([[14, 11], [8.5, 9], [6.5, 3], [10, 2.5], [11.2, 7], [15, 9]], trim), [trimL, trimD]);
         break;
       case 'phoenix':
-        crest = `<path d="M100 36 C90 24 98 14 100 4 C104 16 112 26 100 36 Z" fill="#ffb020"/><path d="M86 40 C76 30 82 22 84 14 C88 22 96 30 86 40 Z" fill="#ff8a1f"/><path d="M114 40 C124 30 118 22 116 14 C112 22 104 30 114 40 Z" fill="#ff8a1f"/>` +
-          `<path d="M100 40 L108 60 L100 68 L92 60 Z" fill="${trim}"/>`;
+        layer((t) => {
+          t.poly([[16, 9], [17, 4.5], [20, 0.5], [23, 4.5], [24, 9]], '#ffb020');
+          t.mpoly([[13, 10], [13, 6], [16, 4], [17, 8.5]], '#ff8a1f');
+          t.poly([[18.2, 9], [19, 5.5], [20, 3.5], [21, 5.5], [21.8, 9]], '#fff3b0');
+        });
         break;
       default:
-        crest = `<path d="M100 36 L114 62 L100 54 L86 62 Z" fill="${trim}"/><circle cx="100" cy="62" r="3.5" fill="${suitL}"/>` +
-          `<path d="M64 76 L84 68 M136 76 L116 68" stroke="${trim}" stroke-width="4" stroke-linecap="round"/>`;
+        break;
     }
-    head = crest +
-      `<path d="M54 108 C50 58 72 34 100 34 C128 34 150 58 146 108 C146 136 128 158 100 160 C72 158 54 136 54 108 Z" fill="${suit}"/>` +
-      `<path d="M60 92 C62 62 78 46 100 44" stroke="${suitL}" stroke-width="5" fill="none" stroke-linecap="round" opacity=".7"/>` +
-      `<path d="M64 98 C70 90 130 90 136 98 C140 118 124 140 100 144 C76 140 60 118 64 98 Z" fill="#0a0d10" stroke="${trim}" stroke-width="3"/>` +
-      `<path d="M72 100 L98 100 L80 126 Z" fill="#fff" opacity=".16"/>` +
-      `<path d="M76 142 Q100 158 124 142 L118 158 Q100 166 82 158 Z" fill="#f2f5f6"/>`;
-    // crest pieces that sit on top of the helmet shell
-    if (a.helmet === 'tiger') head += `<path d="M92 40 L92 56 M100 38 L100 58 M108 40 L108 56" stroke="${dark}" stroke-width="3" stroke-linecap="round"/>`;
-    if (!a.helmet || a.helmet === 'sentinel') head += `<path d="M100 36 L114 62 L100 54 L86 62 Z" fill="${trim}"/><circle cx="100" cy="62" r="3.5" fill="${suitL}"/><path d="M64 76 L84 68 M136 76 L116 68" stroke="${trim}" stroke-width="4" stroke-linecap="round"/>`;
-    if (a.helmet === 'hawk') head += `<path d="M100 34 L110 58 L100 72 L90 58 Z" fill="${trim}"/>`;
-    if (a.helmet === 'wolf' || a.helmet === 'phoenix') head += `<path d="M100 40 L108 60 L100 68 L92 60 Z" fill="${trim}"/>`;
-    if (a.helmet === 'dragon') head += `<path d="M100 32 L108 54 L100 62 L92 54 Z" fill="${trim}"/>`;
+    layer((t) => t.ellipse(20, 17, 9, 10.5, suit), [suitL, suitD]);
+    // visor (trim edge, glass, glints) and chin guard
+    layer((t) => t.poly([[15.5, 24], [24.5, 24], [23.6, 27.2], [20, 28.4], [16.4, 27.2]], WHITE), [WHITE, WHITE_D]);
+    layer((t) => t.poly([[13.2, 15], [26.8, 15], [25.8, 21.5], [22.8, 24.2], [20, 25], [17.2, 24.2], [14.2, 21.5]], trim));
+    layer((t) => t.poly([[14, 15.8], [26, 15.8], [25, 21], [22.4, 23.4], [20, 24.2], [17.6, 23.4], [15, 21]], '#0a0d10'));
+    [[15, 17], [16, 17], [15, 18], [17, 18]].forEach((g) => hero.set(g[0], g[1], '#ffffff@0.3'));
+    // crest pieces on top of the shell
+    switch (a.helmet) {
+      case 'tiger':
+        [[18, 8], [18, 9], [18, 10], [21, 8], [21, 9], [21, 10], [19, 7], [20, 7], [19, 8], [20, 8]].forEach((s) => hero.set(s[0], s[1], DARK));
+        break;
+      case 'hawk':
+        layer((t) => t.poly([[20, 5.5], [22.5, 11.5], [20, 14.5], [17.5, 11.5]], trim), [trimL, trimD]);
+        break;
+      case 'wolf':
+        layer((t) => t.poly([[20, 7.5], [21.8, 11.5], [20, 13.8], [18.2, 11.5]], trim), [trimL, trimD]);
+        break;
+      case 'dragon':
+        layer((t) => t.poly([[20, 4.5], [22.4, 9.5], [20, 12], [17.6, 9.5]], trim), [trimL, trimD]);
+        break;
+      case 'phoenix':
+        layer((t) => t.poly([[20, 8], [21.8, 11.8], [20, 13.8], [18.2, 11.8]], trim), [trimL, trimD]);
+        break;
+      default:
+        layer((t) => t.poly([[20, 5.5], [24, 11.5], [20, 9.8], [16, 11.5]], trim), [trimL, trimD]);
+        hero.set(19, 12, suitL); hero.set(20, 12, suitL);
+    }
+  } else {
+    // unmasked face
+    layer((t) => { t.rect(11, 17, 2, 4, skin); t.rect(27, 17, 2, 4, skin); });
+    layer((t) => t.ellipse(20, 18, 7.6, 9.6, skin));
+    hero.set(11, 19, skinD); hero.set(28, 19, skinD);
+    const eye = (x) => {
+      hero.rect(x, 16, 3, 1, INK);
+      hero.rect(x, 17, 3, 3, '#ffffff');
+      hero.rect(x + 1, 17, 2, 3, ch.eye);
+      hero.set(x + 1, 18, INK); hero.set(x + 1, 17, '#ffffff');
+    };
+    eye(15); eye(22);
+    hero.rect(14, 14, 4, 1, hairD); hero.rect(22, 14, 4, 1, hairD);
+    hero.set(19, 21, skinD); hero.set(20, 21, skinD);
+    hero.rect(18, 24, 4, 1, '#8a3b3b'); hero.set(17, 23, '#8a3b3b'); hero.set(22, 23, '#8a3b3b');
+    hero.rect(14, 21, 2, 1, '#ff7a7a@0.4'); hero.rect(24, 21, 2, 1, '#ff7a7a@0.4');
+    // front hair
+    switch (a.hairStyle) {
+      case 'swept':
+        layer((t) => { t.poly([[11.5, 18], [11, 11], [14, 6.5], [21, 5], [27, 7], [29, 12], [28.5, 18], [27, 13], [22, 10], [17, 10.5], [13.5, 14]], hair); t.poly([[14, 11], [19, 8], [26, 9], [21, 11]], hairL); });
+        break;
+      case 'long':
+        layer((t) => t.poly([[12, 17], [11.5, 11], [14, 7], [20, 5.5], [26, 7], [28.5, 11], [28, 17], [26, 13], [20, 10.5], [14, 13]], hair));
+        break;
+      default:
+        layer((t) => t.poly([[12, 17], [11.5, 11], [14, 7], [20, 5.5], [26, 7], [28.5, 11], [28, 17], [26, 13.5], [23, 11.5], [20, 13], [17, 11.5], [14, 13.5]], hair));
+        [[15, 8], [16, 7], [17, 7]].forEach((s) => hero.set(s[0], s[1], hairL));
+    }
   }
 
-  return `<svg viewBox="0 0 200 240" xmlns="http://www.w3.org/2000/svg" class="avatar-svg" role="img" aria-label="Your ranger"><defs>${defs}</defs>` +
-    bg + beast + aura + weaponBack + cape + hairBack + body + chest + head + hairFront + weaponFront + `</svg>`;
+  // ---- weapon in front ----
+  if (a.weapon === 'blaster') {
+    layer((t) => { t.rect(22, 43, 11, 4, '#2a3138'); t.rect(22, 42, 8, 1, trim); t.rect(31, 41, 3, 3, '#2a3138'); t.rect(24, 44, 6, 1, suitL); t.set(34, 42, suitL); });
+  }
+
+  hero.outline(INK);
+
+  const beast = pxBeast(a.beast, trim);
+  const aura = pxAura(a.aura, suit);
+  return `<svg viewBox="0 0 ${GW} ${GH}" shape-rendering="crispEdges" xmlns="http://www.w3.org/2000/svg" class="avatar-svg avatar-pixel" role="img" aria-label="Your ranger">` +
+    pxBackground(a.background).svg() +
+    (beast ? beast.svg() : '') +
+    (aura ? `<g class="aura-pulse">${aura.svg()}</g>` : '') +
+    hero.svg() + '</svg>';
 }
