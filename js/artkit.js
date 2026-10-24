@@ -111,10 +111,13 @@ const ArtKit = (() => {
     const ck = `${key}|${suitHex}|${trimHex}`;
     if (recolorCache[ck]) return recolorCache[ck];
     const im = rec.im;
+    // big sprites are only shown a few hundred pixels tall, so recolor a smaller copy (faster on phones)
+    const scale = Math.min(1, 900 / im.naturalHeight);
     const c = document.createElement('canvas');
-    c.width = im.naturalWidth; c.height = im.naturalHeight;
+    c.width = Math.round(im.naturalWidth * scale); c.height = Math.round(im.naturalHeight * scale);
     const ctx = c.getContext('2d');
-    ctx.drawImage(im, 0, 0);
+    ctx.imageSmoothingQuality = 'high';
+    ctx.drawImage(im, 0, 0, c.width, c.height);
     const data = ctx.getImageData(0, 0, c.width, c.height);
     const d = data.data;
     const suit = hexToRgb(suitHex), trim = hexToRgb(trimHex);
