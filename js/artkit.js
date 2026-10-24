@@ -102,13 +102,13 @@ const ArtKit = (() => {
     });
   }
 
-  function recolored(key, suitHex, trimHex) {
+  function recolored(key, suitHex, trimHex, accentHex = null) {
     const rec = imgs[key];
     if (!rec) return '';
     const keepSuit = suitHex === '#14a85f';
     const keepTrim = trimHex === '#f2c14e';
-    if (keepSuit && keepTrim) return rec.url;
-    const ck = `${key}|${suitHex}|${trimHex}`;
+    if (keepSuit && keepTrim && !accentHex) return rec.url;
+    const ck = `${key}|${suitHex}|${trimHex}|${accentHex || ""}`;
     if (recolorCache[ck]) return recolorCache[ck];
     const im = rec.im;
     // big sprites are only shown a few hundred pixels tall, so recolor a smaller copy (faster on phones)
@@ -120,13 +120,17 @@ const ArtKit = (() => {
     ctx.drawImage(im, 0, 0, c.width, c.height);
     const data = ctx.getImageData(0, 0, c.width, c.height);
     const d = data.data;
-    const suit = hexToRgb(suitHex), trim = hexToRgb(trimHex);
+    const suit = hexToRgb(suitHex), trim = hexToRgb(trimHex), accent = accentHex ? hexToRgb(accentHex) : null;
+    // with the helmet off, leave the face area alone (skin, eyes, teeth are not "white trim")
+    const faceRows = /helmet-off$|^legacyRangerOff$/.test(key) ? Math.round(c.height * 0.21) : 0;
     for (let i = 0; i < d.length; i += 4) {
       if (d[i + 3] < 10) continue;
       const [h, s, l] = rgbToHsl(d[i], d[i + 1], d[i + 2]);
       let out = null;
       if (!keepSuit && h >= 75 && h <= 175 && s > 0.25 && l < 0.7) out = tint(suit, l, 0.27);
       else if (!keepTrim && h >= 36 && h <= 58 && s > 0.45 && l > 0.28) out = tint(trim, l, 0.5);
+      // white boots, gloves and suit accents (white and its light-gray shading)
+      else if (accent && l > 0.58 && Math.max(d[i], d[i + 1], d[i + 2]) - Math.min(d[i], d[i + 1], d[i + 2]) < 40 && Math.floor(i / 4 / c.width) >= faceRows) out = tint(accent, l, 0.92);
       if (out) { d[i] = out[0]; d[i + 1] = out[1]; d[i + 2] = out[2]; }
     }
     ctx.putImageData(data, 0, 0);
@@ -202,6 +206,8 @@ const ArtKit = (() => {
       const L = q.loadout;
       const suitHex = (SUITS.find((s) => s.id === a.suit) || SUITS[0]).color;
       const trimHex = (TRIMS.find((t) => t.id === a.trim) || TRIMS[0]).color;
+      const accentOpt = TRIMS2.find((t) => t.id === a.trim2) || TRIMS2[0];
+      const accentHex = accentOpt.id === 'white' ? null : accentOpt.color; // white = the art as drawn
       const superOk = L.superOn && modesAvailable(q).includes(L.superMode);
       const helmet = a.morphed !== false ? 'on' : 'off';
       const weapon = L.weaponHeld && L.weapon ? L.weapon : null;
@@ -271,7 +277,7 @@ const ArtKit = (() => {
       html += '<div class="art-figure"><div class="art-bob">';
       if (main !== 'wait') {
         const isPower = main === 'legacyPower' || main.startsWith('super-');
-        html += `<img class="art-ranger${isPower ? ' art-power' : ''}" alt="" src="${recolored(main, suitHex, trimHex)}">`;
+        html += `<img class="art-ranger${isPower ? ' art-power' : ''}" alt="" src="${recolored(main, suitHex, trimHex, accentHex)}">`;
       }
 
       // holstered blaster + held weapon, only when the ranger photo doesn't already include them

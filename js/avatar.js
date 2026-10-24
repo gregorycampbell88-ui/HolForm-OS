@@ -29,6 +29,15 @@ const TRIMS = [
   { id: 'graphite', label: 'Graphite', lv: 6, color: '#6b727a' },
   { id: 'onyx', label: 'Onyx', lv: 7, color: '#2b3036' },
 ];
+// Trim 2 recolors the white parts (boots, gloves, suit accents). Same colors as trim 1;
+// white is the art as drawn, so it is free from the start.
+const TRIMS2 = [
+  { id: 'white', label: 'White', lv: 1, color: '#f4f6f7' },
+  { id: 'gold', label: 'Gold', lv: 1, color: '#f2c14e' },
+  { id: 'silver', label: 'Silver', lv: 5, color: '#cfd6dc' },
+  { id: 'graphite', label: 'Graphite', lv: 6, color: '#6b727a' },
+  { id: 'onyx', label: 'Onyx', lv: 7, color: '#2b3036' },
+];
 const HELMETS = [
   { id: 'sentinel', label: 'Sentinel', lv: 1 },
   { id: 'tiger', label: 'Tiger', lv: 1 },
@@ -132,6 +141,7 @@ const HAIR_COLORS = [
 const CATALOG_SECTIONS = [
   { key: 'suit', label: 'Suit color', items: SUITS, onboarding: true },
   { key: 'trim', label: 'Trim', items: TRIMS, onboarding: true },
+  { key: 'trim2', label: 'Trim 2 (boots, gloves, accents)', items: TRIMS2 },
   { key: 'helmet', label: 'Helmet', items: HELMETS, onboarding: true },
   { key: 'emblem', label: 'Emblem', items: EMBLEMS, onboarding: true },
   { key: 'skin', label: 'Skin tone (helmet off)', items: SKINS, onboarding: true },

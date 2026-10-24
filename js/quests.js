@@ -64,7 +64,7 @@ const questUI = {
 function qDefaultAvatar() {
   return {
     v: 2, chosen: false, morphed: true, facePhoto: false, useArt: true,
-    suit: 'crimson', trim: 'gold', helmet: 'sentinel', emblem: 'tiger',
+    suit: 'crimson', trim: 'gold', trim2: 'white', helmet: 'sentinel', emblem: 'tiger',
     chest: 'standard', gloves: 'standard', boots: 'standard', weapon: 'none', cape: 'none', beast: 'none', aura: 'none', background: 'plain',
     base: 'kai', skin: 's3', hairStyle: 'short', hairColor: 'black',
   };
@@ -226,7 +226,7 @@ function levelInfo(xp) {
 
 function unlocksAtLevel(lv) {
   const out = [];
-  const suffix = { suit: ' suit', trim: ' trim', hairColor: ' hair', background: ' background' };
+  const suffix = { suit: ' suit', trim: ' trim', trim2: ' boots & gloves trim', hairColor: ' hair', background: ' background' };
   CATALOG_SECTIONS.forEach((s) => s.items.forEach((i) => { if (i.lv === lv && lv > 1) out.push(i.label + (suffix[s.key] || '')); }));
   return out;
 }
@@ -1230,18 +1230,18 @@ function renderFaceControls(preview) {
 
 // With your art, gear comes from the shop/loadout. The customizer keeps the
 // color and look options that still apply: suit, trim, background, and glow effects.
-const ART_ALLOWED = { suit: null, trim: null, aura: ['none', 'glow', 'bolt', 'legend'], background: null };
+const ART_ALLOWED = { suit: null, trim: null, trim2: null, aura: ['none', 'glow', 'bolt', 'legend'], background: null };
 
 function customizerSections(onboarding) {
   const art = artActive();
   const out = [];
   CATALOG_SECTIONS.forEach((s) => {
     if (onboarding && !s.onboarding) return;
-    if (!art) { out.push(s); return; }
+    if (!art) { if (s.key !== 'trim2') out.push(s); return; } // trim 2 only recolors the art
     if (!(s.key in ART_ALLOWED)) return;
     const allow = ART_ALLOWED[s.key];
     const items = allow ? s.items.filter((i) => allow.includes(i.id)) : s.items;
-    if (items.length > 1 || s.key === 'suit' || s.key === 'trim') out.push({ ...s, items });
+    if (items.length > 1 || s.key === 'suit' || s.key === 'trim' || s.key === 'trim2') out.push({ ...s, items });
   });
   return out;
 }
