@@ -620,6 +620,18 @@ function avatarHTML(a, fx) {
   return avatarSVG(a);
 }
 
+// A one-shot effect must not linger: once it has played, strip its classes and the aura element.
+let fxTimer = null;
+function scheduleClearFx() {
+  clearTimeout(fxTimer);
+  fxTimer = setTimeout(() => {
+    document.querySelectorAll('.art-scene').forEach((s) => {
+      s.classList.remove('fx-morph', 'fx-powerup', 'fx-power', 'fx-pop');
+      s.querySelectorAll('.art-powerup').forEach((n) => n.remove());
+    });
+  }, 1000);
+}
+
 function renderCharacterCard() {
   const q = state.quest;
   const info = levelInfo(q.xp);
@@ -630,6 +642,7 @@ function renderCharacterCard() {
   // one-shot effect for whatever the player just toggled (consumed so it plays once)
   const fx = questUI.fx;
   questUI.fx = null;
+  if (fx) scheduleClearFx();
   if (art) {
     buttons.push(el('button', {
       class: 'morpher-btn',

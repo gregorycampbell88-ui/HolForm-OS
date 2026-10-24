@@ -975,27 +975,31 @@ main {
 .inv-on .inv-name { color: var(--green); }
 .q-inventory > .q-btn { margin-top: 10px; }
 
-/* Back to Action: a quick burst of the aura art (tinted to the suit color), then gone */
+/* Back to Action: a quick burst of the aura art (tinted to the suit color) that flashes and is gone.
+   Every part is inside its animation, and the effect classes are removed afterwards (see clearFx). */
 .art-powerup { position: absolute; left: 50%; bottom: 0; height: 102%; width: auto; transform: translateX(-50%); transform-origin: 50% 100%; pointer-events: none; opacity: 0; }
-.fx-powerup .art-powerup { animation: auraBurst 0.95s ease-out forwards; }
+.fx-powerup .art-powerup { animation: auraBurst 0.7s ease-out both; }
 @keyframes auraBurst {
-  0% { opacity: 0; transform: translateX(-50%) scale(0.72, 0.6); }
-  12% { opacity: 1; transform: translateX(-50%) scale(1.04, 1.1); }
-  30% { opacity: 0.75; transform: translateX(-50%) scale(0.98, 1.02); }
-  46% { opacity: 1; transform: translateX(-50%) scale(1.05, 1.12); }
-  100% { opacity: 0; transform: translateX(-50%) scale(1.12, 1.3); }
+  0% { opacity: 0; transform: translateX(-50%) scale(0.75, 0.6); }
+  15% { opacity: 1; transform: translateX(-50%) scale(1.04, 1.1); }
+  40% { opacity: 0.85; transform: translateX(-50%) scale(1.02, 1.12); }
+  100% { opacity: 0; transform: translateX(-50%) scale(1.1, 1.3); }
 }
 .art-scene.fx-powerup::after {
   background: radial-gradient(circle at 50% 55%, var(--aura-core), transparent 62%);
-  animation: fxFlash 0.4s ease-out;
+  animation: fxFlash 0.35s ease-out;
 }
-.art-scene.fx-powerup .art-figure { animation: fxCharge 0.9s ease-out; }
-.art-scene.fx-powerup .art-ranger { filter: drop-shadow(0 0 6px var(--aura)); }
+.art-scene.fx-powerup .art-figure { animation: fxCharge 0.6s ease-out; }
+.art-scene.fx-powerup .art-ranger { animation: rangerGlow 0.7s ease-out; }
+@keyframes rangerGlow {
+  0% { filter: drop-shadow(0 0 0 transparent); }
+  20% { filter: drop-shadow(0 0 9px var(--aura)); }
+  100% { filter: drop-shadow(0 0 0 transparent); }
+}
 @keyframes fxCharge {
   0% { transform: scale(0.97); }
-  15%, 45% { transform: translateX(-1%) scale(1.01); }
-  30%, 60% { transform: translateX(1%) scale(1.01); }
-  80% { transform: scale(1.04); }
+  20%, 60% { transform: translateX(-1%) scale(1.01); }
+  40%, 80% { transform: translateX(1%) scale(1.01); }
   100% { transform: scale(1); }
 }
 @media (prefers-reduced-motion: reduce) { .art-powerup { animation: none !important; } }
