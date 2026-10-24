@@ -902,3 +902,63 @@ main {
 .q-title-name { font-weight: 700; font-size: 0.88rem; }
 
 .q-btn:disabled { opacity: 0.4; cursor: not-allowed; }
+
+/* ---------- motion (all from code; no extra art) ---------- */
+.art-figure, .art-bob { position: absolute; inset: 0; }
+.art-figure { transform-origin: 50% 96%; }
+.art-bob { transform-origin: 50% 96%; animation: artBreathe 4s ease-in-out infinite; will-change: transform; }
+@keyframes artBreathe {
+  0%, 100% { transform: translateY(0) scale(1); }
+  50% { transform: translateY(-0.7%) scale(1.012); }
+}
+.art-beast { animation: beastDrift 7s ease-in-out infinite; }
+@keyframes beastDrift {
+  0%, 100% { transform: translate(0, 0); }
+  50% { transform: translate(1.2%, -1%); }
+}
+.art-bike { animation: bikeIdle 1.3s ease-in-out infinite; }
+@keyframes bikeIdle {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-0.6%); }
+}
+/* power-up poses glow and breathe a little harder */
+.art-ranger.art-power { animation: powerGlow 1.8s ease-in-out infinite; }
+@keyframes powerGlow {
+  0%, 100% { filter: drop-shadow(0 0 3px rgba(255, 200, 60, 0.35)); }
+  50% { filter: drop-shadow(0 0 9px rgba(255, 200, 60, 0.85)); }
+}
+
+/* one-shot effects when you toggle something */
+.art-scene::after { content: ''; position: absolute; inset: 0; pointer-events: none; opacity: 0; z-index: 5; }
+.art-scene.fx-morph::after {
+  background: radial-gradient(circle at 50% 45%, rgba(255, 255, 255, 0.95), rgba(0, 255, 150, 0) 65%);
+  animation: fxFlash 0.6s ease-out;
+}
+.art-scene.fx-power::after {
+  background: radial-gradient(circle at 50% 50%, rgba(255, 230, 120, 0.95), rgba(255, 140, 0, 0) 70%);
+  animation: fxFlash 0.7s ease-out;
+}
+@keyframes fxFlash { 0% { opacity: 1; } 100% { opacity: 0; } }
+.art-scene.fx-morph .art-figure { animation: fxPop 0.45s ease-out; }
+.art-scene.fx-pop .art-figure { animation: fxPop 0.3s ease-out; }
+.art-scene.fx-power .art-figure { animation: fxShake 0.5s ease-out; }
+@keyframes fxPop { 0% { transform: scale(0.94); } 60% { transform: scale(1.04); } 100% { transform: scale(1); } }
+@keyframes fxShake {
+  0%, 100% { transform: translateX(0); }
+  15% { transform: translateX(-2.2%); }
+  30% { transform: translateX(2%); }
+  45% { transform: translateX(-1.6%); }
+  60% { transform: translateX(1.2%); }
+  80% { transform: translateX(-0.6%); }
+}
+
+.motion-row { text-align: center; margin-top: 6px; }
+.motion-toggle { background: none; border: none; color: var(--mid-gray); font-size: 0.72rem; text-decoration: underline; cursor: pointer; padding: 4px 8px; }
+
+/* respect the phone's reduce-motion setting, or the in-app switch */
+@media (prefers-reduced-motion: reduce) {
+  .art-bob, .art-beast, .art-bike, .art-ranger.art-power, .art-scene::after, .art-scene .art-figure { animation: none !important; }
+}
+.reduce-motion .art-bob, .reduce-motion .art-beast, .reduce-motion .art-bike,
+.reduce-motion .art-ranger.art-power, .reduce-motion .art-scene::after,
+.reduce-motion .art-scene .art-figure, .reduce-motion .aura-pulse { animation: none !important; }

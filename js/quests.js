@@ -48,6 +48,7 @@ const questUI = {
   titlesOpen: false,
   loadoutOpen: false,
   shopOpen: true,
+  fx: null,
   editBudget: 20,
   editFinish: EDIT_DEFAULT_FINISH,
   skipIdx: 0,
@@ -604,11 +605,11 @@ function renderTitles() {
 
 // Your sprites from the art/ folder when present, otherwise the drawn pixel ranger.
 function artActive() { return typeof ArtKit !== 'undefined' && ArtKit.active(state.quest.avatar); }
-function avatarHTML(a) {
+function avatarHTML(a, fx) {
   // hold an empty frame until we know whether art exists, so the drawn ranger doesn't flash
   if (typeof ArtKit !== 'undefined' && !ArtKit.settled()) return '<div class="art-scene" aria-hidden="true"></div>';
   if (artActive()) {
-    const h = ArtKit.sceneHTML(a, state.quest);
+    const h = ArtKit.sceneHTML(a, state.quest, fx);
     if (h !== null) return h;
   }
   return avatarSVG(a);
@@ -621,10 +622,13 @@ function renderCharacterCard() {
   const buttons = [
     el('button', { class: 'q-btn q-btn-ghost', onclick: () => { questUI.customizing = true; render(); } }, 'Customize'),
   ];
+  // one-shot effect for whatever the player just toggled (consumed so it plays once)
+  const fx = questUI.fx;
+  questUI.fx = null;
   if (art) {
     buttons.push(el('button', {
       class: 'morpher-btn', 'aria-label': q.avatar.morphed === false ? 'Helmet on' : 'Helmet off',
-      onclick: () => { q.avatar.morphed = q.avatar.morphed === false; q.stats.morphs += 1; qCheckTitles(); saveState(); render(); },
+      onclick: () => { q.avatar.morphed = q.avatar.morphed === false; q.stats.morphs += 1; questUI.fx = 'morph'; qCheckTitles(); saveState(); render(); },
     }, [
       ArtKit.url('morpher') ? el('img', { src: ArtKit.url('morpher'), alt: '' }) : null,
       el('span', {}, q.avatar.morphed === false ? 'Morph' : 'Unmorph'),
@@ -632,7 +636,7 @@ function renderCharacterCard() {
   }
   const pp = ppBalance(q);
   return el('div', { class: 'q-card q-character' }, [
-    el('div', { class: 'avatar-wrap' + (art ? ' art-wrap' : ''), html: avatarHTML(q.avatar) }),
+    el('div', { class: 'avatar-wrap' + (art ? ' art-wrap' : ''), html: avatarHTML(q.avatar, fx) }),
     el('div', { class: 'q-char-info' }, [
       el('div', { class: 'q-level' }, `Level ${info.level}`),
       el('div', { class: 'q-title' }, (titleById(q.titles.equipped) || titleById('recruit')).name),
@@ -657,6 +661,7 @@ function chipBtn(label, { on = false, locked = false, onclick = null, title = ''
 
 function setLoadout(change) {
   const q = state.quest;
+  questUI.fx = ('superOn' in change || 'superMode' in change) ? 'power' : 'pop';
   Object.assign(q.loadout, change);
   shopSanitize(q);
   saveState();
@@ -674,7 +679,7 @@ function renderFormToggles() {
 
   row.appendChild(chipBtn(q.avatar.morphed === false ? 'Helmet off' : 'Helmet on', {
     on: q.avatar.morphed !== false, locked: superOn,
-    onclick: () => { q.avatar.morphed = q.avatar.morphed === false; saveState(); render(); },
+    onclick: () => { q.avatar.morphed = q.avatar.morphed === false; questUI.fx = 'morph'; saveState(); render(); },
   }));
   row.appendChild(q.owned.shield
     ? chipBtn('Shield', { on: L.shieldOn, locked: superOn, onclick: () => setLoadout({ shieldOn: !L.shieldOn }) })
@@ -688,8 +693,28 @@ function renderFormToggles() {
   row.appendChild(modes.length
     ? chipBtn(superOn ? `Super: ${modeName(L.superMode)}` : 'Super Mode', { on: superOn, onclick: () => setLoadout({ superOn: !L.superOn }) })
     : chipBtn('Super Mode 🔒', { locked: true, title: 'Buy the Chest Shield first' }));
-  return el('div', { class: 'q-card' }, [row]);
+  const motion = el('button', {
+    class: 'motion-toggle',
+    onclick: () => { setMotionOff(!motionOff()); render(); },
+  }, motionOff() ? 'Motion: off' : 'Motion: on');
+  return el('div', { class: 'q-card' }, [row, el('div', { class: 'motion-row' }, [motion])]);
 }
+
+// ---- motion preference (this device only; follows the phone's "reduce motion" setting by default) ----
+const MOTION_KEY = 'holform-motion';
+function motionOff() {
+  try {
+    const v = localStorage.getItem(MOTION_KEY);
+    if (v === 'off') return true;
+    if (v === 'on') return false;
+  } catch (e) { /* storage unavailable */ }
+  return !!(window.matchMedia && matchMedia('(prefers-reduced-motion: reduce)').matches);
+}
+function setMotionOff(off) {
+  try { localStorage.setItem(MOTION_KEY, off ? 'off' : 'on'); } catch (e) { /* storage unavailable */ }
+  applyMotion();
+}
+function applyMotion() { document.documentElement.classList.toggle('reduce-motion', motionOff()); }
 
 function renderLoadout() {
   const q = state.quest;
@@ -755,7 +780,7 @@ function renderShop() {
         : el('button', {
           class: 'q-btn q-btn-small',
           ...(c.ok ? {} : { disabled: 'disabled' }),
-          onclick: () => { if (shopBuy(q, item.id)) { qCheckTitles(); saveState(); render(); } },
+          onclick: () => { if (shopBuy(q, item.id)) { questUI.fx = 'pop'; qCheckTitles(); saveState(); render(); } },
         }, `⚡ ${item.cost}`),
     ]));
   });
@@ -1197,6 +1222,7 @@ function renderCustomizer(onboarding) {
 
 function qInit() {
   qEnsure();
+  applyMotion();
   if (typeof Face !== 'undefined') Face.init(() => render());
   if (typeof ArtKit !== 'undefined') ArtKit.init(() => render());
   const bar = document.getElementById('active-bar');

@@ -5,3 +5,7 @@
 
 # sprites waiting to be sorted (not published until moved into art/)
 art-inbox/
+
+# local scratch work (image experiments, helper scripts) - never publish
+output/
+tmp/

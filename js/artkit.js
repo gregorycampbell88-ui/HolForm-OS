@@ -160,7 +160,8 @@ const ArtKit = (() => {
 
     // Compose the scene. Returns null when no art exists at all (caller falls back
     // to the drawn ranger); returns the frame without a ranger while it is loading.
-    sceneHTML(a, q) {
+    // `fx` ('morph' | 'power' | 'pop') plays a one-shot effect on this render.
+    sceneHTML(a, q, fx) {
       const L = q.loadout;
       const suitHex = (SUITS.find((s) => s.id === a.suit) || SUITS[0]).color;
       const trimHex = (TRIMS.find((t) => t.id === a.trim) || TRIMS[0]).color;
@@ -180,7 +181,7 @@ const ArtKit = (() => {
       if (main === null) return null;
 
       const slice = (inner) => `viewBox="0 0 ${GW} ${GH}" preserveAspectRatio="xMidYMid slice" shape-rendering="crispEdges">${inner}`;
-      let html = '<div class="art-scene" role="img" aria-label="Your ranger">';
+      let html = `<div class="art-scene${fx ? ' fx-' + fx : ''}" role="img" aria-label="Your ranger">`;
       html += `<svg class="art-bg" ${slice(pxBackground(a.background).svg())}</svg>`;
       if (a.aura && a.aura !== 'none' && a.aura !== 'blaze') {
         const aura = pxAura(a.aura, suitHex);
@@ -199,6 +200,8 @@ const ArtKit = (() => {
         if (bike && bike !== 'wait') html += `<img class="art-bike" alt="" src="${imgs.motorcycle.url}">`;
       }
 
+      // the ranger and what he holds move together (effects on art-figure, idle breathing on art-bob)
+      html += '<div class="art-figure"><div class="art-bob">';
       if (main !== 'wait') {
         const isPower = main === 'legacyPower' || main.startsWith('super-');
         html += `<img class="art-ranger${isPower ? ' art-power' : ''}" alt="" src="${recolored(main, suitHex, trimHex)}">`;
@@ -215,7 +218,7 @@ const ArtKit = (() => {
           if (wp && wp !== 'wait') html += `<img class="art-weapon" alt="" style="${place(WEAPON_PLACE[weapon] || WEAPON_PLACE.default)}" src="${imgs[wp].url}">`;
         }
       }
-      html += '</div>';
+      html += '</div></div></div>';
       return html;
     },
   };
