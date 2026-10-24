@@ -46,7 +46,7 @@ const questUI = {
   customizing: false,
   artOpen: false,
   titlesOpen: false,
-  loadoutOpen: false,
+  inventory: false,
   shopOpen: true,
   fx: null,
   editBudget: 20,
@@ -552,12 +552,17 @@ function renderQuest() {
   if (q.newTitles.length) c.appendChild(renderNewTitle());
   if (questUI.result) c.appendChild(renderResult());
   if (questUI.nextAnchor) c.appendChild(renderNextAnchor());
+  if (artActive() && questUI.inventory) {
+    // inventory view: keep the ranger on screen so each pick shows right away
+    c.appendChild(renderInventory());
+    return;
+  }
   if (artActive()) c.appendChild(renderFormToggles());
   c.appendChild(renderSessionPanel());
   c.appendChild(renderMissionPanel());
   const extras = renderSavedAndConvos();
   if (extras) c.appendChild(extras);
-  if (artActive()) { c.appendChild(renderLoadout()); c.appendChild(renderShop()); }
+  if (artActive()) c.appendChild(renderShop());
   c.appendChild(renderTitles());
   c.appendChild(renderCalendarCard());
   c.appendChild(renderRecentLog());
@@ -627,12 +632,15 @@ function renderCharacterCard() {
   questUI.fx = null;
   if (art) {
     buttons.push(el('button', {
-      class: 'morpher-btn', 'aria-label': q.avatar.morphed === false ? 'Helmet on' : 'Helmet off',
+      class: 'morpher-btn',
       onclick: () => { q.avatar.morphed = q.avatar.morphed === false; q.stats.morphs += 1; questUI.fx = 'morph'; qCheckTitles(); saveState(); render(); },
     }, [
       ArtKit.url('morpher') ? el('img', { src: ArtKit.url('morpher'), alt: '' }) : null,
-      el('span', {}, q.avatar.morphed === false ? 'Morph' : 'Unmorph'),
+      el('span', {}, q.avatar.morphed === false ? 'Back to Action' : 'Power Down'),
     ]));
+    buttons.push(el('button', {
+      class: 'q-btn q-btn-ghost', onclick: () => { questUI.inventory = !questUI.inventory; render(); },
+    }, questUI.inventory ? 'Close inventory' : 'Inventory'));
   }
   const pp = ppBalance(q);
   return el('div', { class: 'q-card q-character' }, [
@@ -716,36 +724,84 @@ function setMotionOff(off) {
 }
 function applyMotion() { document.documentElement.classList.toggle('reduce-motion', motionOff()); }
 
-function renderLoadout() {
+// ---- inventory: everything unlocked, tap to equip ----
+
+const WEAPON_ICON_FALLBACK = { 'guardian-blade': 'legacySword' };
+const INV_GLYPH = {
+  gun: '🔫', 'short-swords': '⚔️', 'battle-axe': '🪓', 'short-staff': '🪄', daggers: '🗡️', 'bo-staff': '🏑', 'guardian-blade': '⚔️',
+  shield: '🛡️', holster: '🔫', bike: '🏍️', beast: '🐾', megazord: '🤖', mode: '⚡', emblem: '🔰', hands: '✋',
+};
+
+// one tappable tile: picture (or a placeholder glyph until the art arrives), name, small caption
+function invTile({ keys = [], glyph = '', name, sub = '', on = false, onclick = null }) {
+  let src = '';
+  for (const k of keys) { src = ArtKit.url(k); if (src) break; }
+  return el('button', { class: 'inv-tile' + (on ? ' inv-on' : ''), ...(onclick ? { onclick } : {}) }, [
+    el('div', { class: 'inv-pic' }, src ? el('img', { src, alt: '' }) : el('span', { class: 'inv-glyph' }, glyph)),
+    el('div', { class: 'inv-name' }, name),
+    sub ? el('div', { class: 'inv-sub' }, sub) : null,
+  ]);
+}
+
+function renderInventory() {
   const q = state.quest;
   const L = q.loadout;
-  const det = el('details', { class: 'q-card q-loadout', ...(questUI.loadoutOpen ? { open: 'open' } : {}) });
-  det.addEventListener('toggle', () => { questUI.loadoutOpen = det.open; });
-  det.appendChild(el('summary', {}, 'Loadout'));
+  const superOn = L.superOn && modesAvailable(q).includes(L.superMode);
+  const wrap = el('div', { class: 'q-card q-inventory' });
+  wrap.appendChild(qSection('Inventory', 'UNLOCKED'));
+  wrap.appendChild(el('div', { class: 'q-sub q-dim' }, 'Tap something to use it. Only what you have unlocked shows here.'));
 
-  det.appendChild(el('div', { class: 'q-custom-label' }, 'Emblem'));
-  det.appendChild(el('div', { class: 'chip-row' }, FORMS.filter((f) => emblemOwned(q, f.id)).map((f) =>
-    chipBtn(f.name, { on: L.emblem === f.id, onclick: () => setLoadout({ emblem: f.id, ...(modesAvailable(q).includes(f.mode) ? { superMode: f.mode } : {}) }) }))));
+  const group = (label, tiles, note) => {
+    wrap.appendChild(el('div', { class: 'q-custom-label' }, label));
+    wrap.appendChild(el('div', { class: 'inv-grid' }, tiles));
+    if (note) wrap.appendChild(el('div', { class: 'q-sub q-dim' }, note));
+  };
 
-  det.appendChild(el('div', { class: 'q-custom-label' }, 'Weapon'));
-  const wchips = [chipBtn('None', { on: !L.weapon, onclick: () => setLoadout({ weapon: null, weaponHeld: false }) })];
-  ownedWeapons(q).forEach((w) => wchips.push(chipBtn(WEAPON_NAMES[w], { on: L.weapon === w, onclick: () => setLoadout({ weapon: w, weaponHeld: true }) })));
-  det.appendChild(el('div', { class: 'chip-row' }, wchips));
+  // weapons
+  const weapons = ownedWeapons(q);
+  group('Weapons', [
+    invTile({ glyph: INV_GLYPH.hands, name: 'Empty hands', on: !L.weaponHeld || !L.weapon, onclick: () => setLoadout({ weaponHeld: false }) }),
+    ...weapons.map((w) => invTile({
+      keys: [`weapon-${w}`, WEAPON_ICON_FALLBACK[w]].filter(Boolean), glyph: INV_GLYPH[w], name: WEAPON_NAMES[w],
+      on: L.weapon === w && L.weaponHeld, onclick: () => setLoadout({ weapon: w, weaponHeld: true }),
+    })),
+  ], `${weapons.length} of 7 weapons. Each emblem brings its own.`);
 
-  det.appendChild(el('div', { class: 'q-custom-label' }, 'Super mode'));
+  // gear
+  const gear = [];
+  if (q.owned.shield) gear.push(invTile({ glyph: INV_GLYPH.shield, name: 'Chest Shield', sub: L.shieldOn ? 'Worn' : 'Off', on: L.shieldOn, onclick: () => setLoadout({ shieldOn: !L.shieldOn }) }));
+  if (q.owned.blaster) gear.push(invTile({ keys: ['holster-gun'], glyph: INV_GLYPH.holster, name: 'Blaster holster', sub: L.holster ? 'On belt' : 'Off', on: L.holster, onclick: () => setLoadout({ holster: !L.holster }) }));
+  if (q.owned.bike) gear.push(invTile({ keys: ['motorcycle'], glyph: INV_GLYPH.bike, name: 'Motorcycle', sub: 'Battlizer Mode' }));
+  if (gear.length) group('Gear', gear);
+
+  // emblems
+  const emblems = FORMS.filter((f) => emblemOwned(q, f.id));
+  group('Emblem', emblems.map((f) => invTile({
+    keys: [`emblem-${f.id}`], glyph: INV_GLYPH.emblem, name: f.name, on: L.emblem === f.id,
+    onclick: () => setLoadout({ emblem: f.id, ...(modesAvailable(q).includes(f.mode) ? { superMode: f.mode } : {}) }),
+  })), q.owned.shield ? '' : 'Emblems show on the Chest Shield.');
+
+  // guardian beasts
+  const beasts = [invTile({ glyph: INV_GLYPH.hands, name: 'No beast', on: !L.beast, onclick: () => setLoadout({ beast: null }) })];
+  ownedBeasts(q).forEach((b) => beasts.push(invTile({
+    keys: [`beast-${b}`, b === 'tiger' ? 'legacyBeast' : null].filter(Boolean), glyph: INV_GLYPH.beast,
+    name: b[0].toUpperCase() + b.slice(1), on: L.beast === b, onclick: () => setLoadout({ beast: b }),
+  })));
+  if (megazordAvailable(q)) beasts.push(invTile({ keys: ['megazord'], glyph: INV_GLYPH.megazord, name: 'Megazord', on: L.beast === 'megazord', onclick: () => setLoadout({ beast: 'megazord' }) }));
+  if (ultraAvailable(q)) beasts.push(invTile({ keys: ['ultra-megazord'], glyph: INV_GLYPH.megazord, name: 'Ultra Megazord', on: L.beast === 'ultra', onclick: () => setLoadout({ beast: 'ultra' }) }));
+  group('Guardian beast', beasts, `Beasts: ${ownedBeasts(q).length} of 6. Five unlock the Megazord; all six unlock the Ultra Megazord.`);
+
+  // super modes
   const modes = modesAvailable(q);
-  det.appendChild(modes.length
-    ? el('div', { class: 'chip-row' }, modes.map((m) => chipBtn(modeName(m), { on: L.superMode === m, onclick: () => setLoadout({ superMode: m, superOn: true }) })))
-    : el('div', { class: 'q-sub q-dim' }, 'Buy the Chest Shield to unlock super modes.'));
+  if (modes.length) {
+    group('Super mode', [
+      invTile({ glyph: INV_GLYPH.hands, name: 'Regular form', on: !superOn, onclick: () => setLoadout({ superOn: false }) }),
+      ...modes.map((m) => invTile({ glyph: INV_GLYPH.mode, name: modeName(m), on: superOn && L.superMode === m, onclick: () => setLoadout({ superMode: m, superOn: true }) })),
+    ]);
+  }
 
-  det.appendChild(el('div', { class: 'q-custom-label' }, 'Guardian beast'));
-  const bchips = [chipBtn('None', { on: !L.beast, onclick: () => setLoadout({ beast: null }) })];
-  ownedBeasts(q).forEach((b) => bchips.push(chipBtn(b[0].toUpperCase() + b.slice(1), { on: L.beast === b, onclick: () => setLoadout({ beast: b }) })));
-  if (megazordAvailable(q)) bchips.push(chipBtn('Megazord', { on: L.beast === 'megazord', onclick: () => setLoadout({ beast: 'megazord' }) }));
-  if (ultraAvailable(q)) bchips.push(chipBtn('Ultra Megazord', { on: L.beast === 'ultra', onclick: () => setLoadout({ beast: 'ultra' }) }));
-  det.appendChild(el('div', { class: 'chip-row' }, bchips));
-  det.appendChild(el('div', { class: 'q-sub q-dim' }, `Beasts: ${ownedBeasts(q).length} of 6. Five unlock the Megazord; all six unlock the Ultra Megazord.`));
-  return det;
+  wrap.appendChild(el('button', { class: 'q-btn', onclick: () => { questUI.inventory = false; render(); } }, 'Done'));
+  return wrap;
 }
 
 function renderShop() {

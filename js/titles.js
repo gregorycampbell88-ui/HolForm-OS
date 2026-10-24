@@ -65,7 +65,7 @@ const TITLES = [
   { id: 'squirrel-whisperer', name: 'Squirrel Whisperer', desc: 'Parked 10 ideas instead of chasing them.', test: (c) => c.s.parked >= 10 },
   { id: 'early-bird', name: 'Early Bird', desc: 'Finished a mission before 9 a.m.', test: (c) => c.s.morning >= 1 },
   { id: 'dawn-patrol', name: 'Dawn Patrol', desc: '10 missions finished before 9 a.m.', test: (c) => c.s.morning >= 10 },
-  { id: 'shape-shifter', name: 'Shape-Shifter', desc: 'Morphed ten times.', test: (c) => c.s.morphs >= 10 },
+  { id: 'shape-shifter', name: 'Shape-Shifter', desc: 'Powered down and came back to action ten times.', test: (c) => c.s.morphs >= 10 },
 
   // ---- Sunday ----
   { id: 'sunday-strategist', name: 'Sunday Strategist', desc: 'Wrote your first weekly reflection.', test: (c) => c.reflections >= 1 },

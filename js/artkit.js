@@ -169,16 +169,33 @@ const ArtKit = (() => {
       const helmet = a.morphed !== false ? 'on' : 'off';
       const weapon = L.weaponHeld && L.weapon ? L.weapon : null;
 
+      const holsterWanted = !superOk && !!(L.holster && q.owned.blaster);
+      // Regular form: a ready-made photo that already holds the weapon / holster is best
+      // (nothing floats on top); if it doesn't exist the plain ranger + overlays are used.
+      // name = ranger-<emblem|noshield>[-<weapon>][-holster]-helmet-<on|off>
+      const baked = {}; // key -> what that image already includes
       let mainKeys;
       if (superOk) {
         mainKeys = [`super-${L.superMode}-${weapon || 'unarmed'}`, `super-${L.superMode}-unarmed`, 'legacyPower'];
       } else {
         mainKeys = [];
-        if (L.shieldOn && q.owned.shield) mainKeys.push(`ranger-${L.emblem}-helmet-${helmet}`);
-        mainKeys.push(`ranger-noshield-helmet-${helmet}`, helmet === 'on' ? 'legacyRanger' : 'legacyRangerOff', 'legacyRanger');
+        const add = (b, w, h) => {
+          const key = ['ranger', b, w, h ? 'holster' : null, `helmet-${helmet}`].filter(Boolean).join('-');
+          if (!baked[key]) { baked[key] = { weapon: !!w, holster: !!h }; mainKeys.push(key); }
+        };
+        const bases = L.shieldOn && q.owned.shield ? [L.emblem, 'noshield'] : ['noshield'];
+        bases.forEach((b) => {
+          if (weapon && holsterWanted) add(b, weapon, true);
+          if (weapon) add(b, weapon, false);
+          if (holsterWanted) add(b, null, true);
+          add(b, null, false);
+        });
+        mainKeys.push(helmet === 'on' ? 'legacyRanger' : 'legacyRangerOff', 'legacyRanger');
       }
+      mainKeys.forEach(request); // ask for every candidate at once instead of one after another
       const main = pick(mainKeys);
       if (main === null) return null;
+      const has = (main && baked[main]) || { weapon: false, holster: false };
 
       const slice = (inner) => `viewBox="0 0 ${GW} ${GH}" preserveAspectRatio="xMidYMid slice" shape-rendering="crispEdges">${inner}`;
       let html = `<div class="art-scene${fx ? ' fx-' + fx : ''}" role="img" aria-label="Your ranger">`;
@@ -192,7 +209,8 @@ const ArtKit = (() => {
       if (L.beast) {
         const bk = L.beast === 'megazord' ? 'megazord' : L.beast === 'ultra' ? 'ultra-megazord' : `beast-${L.beast}`;
         const bp = pick([bk, L.beast === 'tiger' ? 'legacyBeast' : null].filter(Boolean));
-        if (bp && bp !== 'wait') html += `<img class="art-beast" alt="" src="${imgs[bp].url}">`;
+        // beasts and zords wear your suit + trim colors too
+        if (bp && bp !== 'wait') html += `<img class="art-beast" alt="" src="${recolored(bp, suitHex, trimHex)}">`;
       }
       // motorcycle with Battlizer
       if (superOk && L.superMode === 'battlizer') {
@@ -207,13 +225,13 @@ const ArtKit = (() => {
         html += `<img class="art-ranger${isPower ? ' art-power' : ''}" alt="" src="${recolored(main, suitHex, trimHex)}">`;
       }
 
-      // holstered blaster + held weapon (regular form only)
+      // holstered blaster + held weapon, only when the ranger photo doesn't already include them
       if (!superOk) {
-        if (L.holster && q.owned.blaster) {
+        if (holsterWanted && !has.holster) {
           const hp = pick(['holster-gun']);
           if (hp && hp !== 'wait') html += `<img class="art-holster" alt="" style="${place(HOLSTER_PLACE)}" src="${imgs['holster-gun'].url}">`;
         }
-        if (weapon) {
+        if (weapon && !has.weapon) {
           const wp = pick([`weapon-${weapon}`, weapon === 'guardian-blade' ? 'legacySword' : null].filter(Boolean));
           if (wp && wp !== 'wait') html += `<img class="art-weapon" alt="" style="${place(WEAPON_PLACE[weapon] || WEAPON_PLACE.default)}" src="${imgs[wp].url}">`;
         }
