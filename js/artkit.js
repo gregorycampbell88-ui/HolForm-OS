@@ -121,16 +121,34 @@ const ArtKit = (() => {
     const data = ctx.getImageData(0, 0, c.width, c.height);
     const d = data.data;
     const suit = hexToRgb(suitHex), trim = hexToRgb(trimHex), accent = accentHex ? hexToRgb(accentHex) : null;
-    // with the helmet off, leave the face area alone (skin, eyes, teeth are not "white trim")
+    const W = c.width;
+    // trim 2 leaves some white alone: with the helmet off the face area (skin, eyes, teeth),
+    // with the helmet on the white mouthpiece
     const faceRows = /helmet-off$|^legacyRangerOff$/.test(key) ? Math.round(c.height * 0.21) : 0;
+    const mouth = /helmet-on$|^legacyRanger$/.test(key)
+      ? { x0: W * 0.44, x1: W * 0.58, y0: c.height * 0.125, y1: c.height * 0.163 } : null;
+    const clamp01 = (v) => Math.max(0, Math.min(1, v));
     for (let i = 0; i < d.length; i += 4) {
       if (d[i + 3] < 10) continue;
-      const [h, s, l] = rgbToHsl(d[i], d[i + 1], d[i + 2]);
+      const r = d[i], g = d[i + 1], b = d[i + 2];
+      const [h, s, l] = rgbToHsl(r, g, b);
       let out = null;
       if (!keepSuit && h >= 75 && h <= 175 && s > 0.25 && l < 0.7) out = tint(suit, l, 0.27);
-      else if (!keepTrim && h >= 36 && h <= 58 && s > 0.45 && l > 0.28) out = tint(trim, l, 0.5);
-      // white boots, gloves and suit accents (white and its light-gray shading)
-      else if (accent && l > 0.58 && Math.max(d[i], d[i + 1], d[i + 2]) - Math.min(d[i], d[i + 1], d[i + 2]) < 40 && Math.floor(i / 4 / c.width) >= faceRows) out = tint(accent, l, 0.92);
+      else {
+        // Gold trim vs white: judged by how colorful the pixel is (HSL saturation is unreliable near white),
+        // and blended across the in-between pixels so the two recolors never leave blotchy edges.
+        const chroma = Math.max(r, g, b) - Math.min(r, g, b);
+        const px = i / 4, y = Math.floor(px / W), x = px % W;
+        // hue 26+ catches the dark orange-ish shading of the gold; skin-orange hues (below 36) are skipped in the face area
+        const wGold = h >= 26 && h <= 58 && l > 0.2 && (h >= 36 || y >= faceRows) ? clamp01((chroma - 30) / 40) : 0;
+        const inMouth = mouth && x >= mouth.x0 && x <= mouth.x1 && y >= mouth.y0 && y <= mouth.y1;
+        const canAccent = accent && l > 0.58 && chroma < 70 && y >= faceRows && !inMouth;
+        const tOut = wGold > 0 ? (keepTrim ? [r, g, b] : tint(trim, l, 0.5)) : null;
+        const aOut = canAccent ? tint(accent, l, 0.92) : [r, g, b];
+        if (wGold >= 1) out = tOut;
+        else if (wGold > 0) out = aOut.map((v, k) => Math.round(v + (tOut[k] - v) * wGold));
+        else if (canAccent) out = aOut;
+      }
       if (out) { d[i] = out[0]; d[i + 1] = out[1]; d[i + 2] = out[2]; }
     }
     ctx.putImageData(data, 0, 0);
