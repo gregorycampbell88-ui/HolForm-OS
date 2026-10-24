@@ -135,6 +135,42 @@ const ArtKit = (() => {
     return url;
   }
 
+  function hslToRgb(h, s, l) {
+    const k = (n) => (n + h / 30) % 12;
+    const a = s * Math.min(l, 1 - l);
+    const f = (n) => l - a * Math.max(-1, Math.min(k(n) - 3, Math.min(9 - k(n), 1)));
+    return [f(0), f(8), f(4)].map((v) => Math.round(v * 255));
+  }
+
+  // Whole-image recolor for effects: swaps the hue to `rgb` and keeps the art's light and shade.
+  function tinted(key, rgb) {
+    const rec = imgs[key];
+    if (!rec) return '';
+    const ck = `${key}|all|${rgb.join(',')}`;
+    if (recolorCache[ck]) return recolorCache[ck];
+    const im = rec.im;
+    const scale = Math.min(1, 900 / im.naturalHeight);
+    const c = document.createElement('canvas');
+    c.width = Math.round(im.naturalWidth * scale); c.height = Math.round(im.naturalHeight * scale);
+    const ctx = c.getContext('2d');
+    ctx.imageSmoothingQuality = 'high';
+    ctx.drawImage(im, 0, 0, c.width, c.height);
+    const data = ctx.getImageData(0, 0, c.width, c.height);
+    const d = data.data;
+    const [th, ts] = rgbToHsl(rgb[0], rgb[1], rgb[2]);
+    const satScale = Math.min(1, ts / 0.7); // pale targets (white, silver) give a pale aura
+    for (let i = 0; i < d.length; i += 4) {
+      if (d[i + 3] < 4) continue;
+      const [, s, l] = rgbToHsl(d[i], d[i + 1], d[i + 2]);
+      const out = hslToRgb(th, Math.min(1, s * satScale), l);
+      d[i] = out[0]; d[i + 1] = out[1]; d[i + 2] = out[2];
+    }
+    ctx.putImageData(data, 0, 0);
+    const url = c.toDataURL('image/png');
+    recolorCache[ck] = url;
+    return url;
+  }
+
   const place = (p) => `left:${p.left}%;bottom:${p.bottom}%;width:${p.width}%`
     + (p.rot ? `;transform:rotate(${p.rot}deg);transform-origin:${p.origin}` : '');
 
@@ -148,6 +184,7 @@ const ArtKit = (() => {
     // is any ranger art present at all? (otherwise the drawn ranger is used)
     hasAny() {
       PRIMARY.forEach(request);
+      request('aura-powerup'); // warm up the power-up burst so it's ready on first use
       return PRIMARY.some((k) => !!imgs[k]);
     },
     // true once we know whether the primary ranger images exist (loaded or confirmed missing)
@@ -225,11 +262,9 @@ const ArtKit = (() => {
         if (bike && bike !== 'wait') html += `<img class="art-bike" alt="" src="${imgs.motorcycle.url}">`;
       }
 
-      // Back to Action: flames + sparks behind the ranger (only rendered for that one-shot effect)
-      if (fx === 'powerup') {
-        html += '<div class="art-powerup"><span class="flame-a"></span><span class="flame-b"></span>'
-          + [8, 22, 36, 50, 64, 78, 90].map((x, i) => `<i style="left:${x}%;animation-delay:${(i * 0.17).toFixed(2)}s"></i>`).join('')
-          + '</div>';
+      // Back to Action: your aura art bursts up behind the ranger (only rendered for that one-shot effect)
+      if (fx === 'powerup' && imgs['aura-powerup']) {
+        html += `<img class="art-powerup" alt="" src="${tinted('aura-powerup', auraRgb)}">`;
       }
 
       // the ranger and what he holds move together (effects on art-figure, idle breathing on art-bob)
