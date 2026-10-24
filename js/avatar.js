@@ -11,21 +11,22 @@ const SUITS = [
   { id: 'solar', label: 'Solar', lv: 1, color: '#e8b82a' },
   { id: 'cobalt', label: 'Cobalt', lv: 1, color: '#2d63d8' },
   { id: 'rose', label: 'Rose', lv: 1, color: '#e0589a' },
-  { id: 'onyx', label: 'Onyx', lv: 2, color: '#2b3036' },
+  { id: 'graphite', label: 'Graphite', lv: 2, color: '#4a5058' },
   { id: 'orange', label: 'Orange', lv: 3, color: '#ee7d1f' },
   { id: 'white', label: 'White', lv: 4, color: '#eef2f4' },
   { id: 'violet', label: 'Violet', lv: 5, color: '#7a4fd0' },
-  { id: 'silver', label: 'Silver', lv: 6, color: '#b9c2c8' },
-  { id: 'navy', label: 'Navy', lv: 7, color: '#1d3470' },
-  { id: 'graphite', label: 'Graphite', lv: 8, color: '#4a5058' },
-  { id: 'gold', label: 'Gold', lv: 9, color: '#cc9a1a' },
+  { id: 'navy', label: 'Navy', lv: 6, color: '#1d3470' },
+  { id: 'silver', label: 'Silver', lv: 7, color: '#b9c2c8' },
+  { id: 'gold', label: 'Gold', lv: 8, color: '#cc9a1a' },
+  { id: 'onyx', label: 'Onyx', lv: 9, color: '#2b3036' },
   { id: 'emerald', label: 'Emerald', lv: 10, color: '#14a85f' },
 ];
-// Trim: gold to start; white, silver, then onyx unlock.
+// Trim: gold to start; white, silver, graphite, then onyx unlock.
 const TRIMS = [
   { id: 'gold', label: 'Gold', lv: 1, color: '#f2c14e' },
   { id: 'white', label: 'White', lv: 3, color: '#f4f6f7' },
   { id: 'silver', label: 'Silver', lv: 5, color: '#cfd6dc' },
+  { id: 'graphite', label: 'Graphite', lv: 6, color: '#6b727a' },
   { id: 'onyx', label: 'Onyx', lv: 7, color: '#2b3036' },
 ];
 const HELMETS = [

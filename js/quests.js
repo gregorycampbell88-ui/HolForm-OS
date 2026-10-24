@@ -633,7 +633,7 @@ function renderCharacterCard() {
   if (art) {
     buttons.push(el('button', {
       class: 'morpher-btn',
-      onclick: () => { q.avatar.morphed = q.avatar.morphed === false; q.stats.morphs += 1; questUI.fx = 'morph'; qCheckTitles(); saveState(); render(); },
+      onclick: () => { q.avatar.morphed = q.avatar.morphed === false; q.stats.morphs += 1; questUI.fx = q.avatar.morphed ? 'powerup' : 'morph'; qCheckTitles(); saveState(); render(); },
     }, [
       ArtKit.url('morpher') ? el('img', { src: ArtKit.url('morpher'), alt: '' }) : null,
       el('span', {}, q.avatar.morphed === false ? 'Back to Action' : 'Power Down'),
@@ -687,7 +687,7 @@ function renderFormToggles() {
 
   row.appendChild(chipBtn(q.avatar.morphed === false ? 'Helmet off' : 'Helmet on', {
     on: q.avatar.morphed !== false, locked: superOn,
-    onclick: () => { q.avatar.morphed = q.avatar.morphed === false; questUI.fx = 'morph'; saveState(); render(); },
+    onclick: () => { q.avatar.morphed = q.avatar.morphed === false; questUI.fx = q.avatar.morphed ? 'powerup' : 'morph'; saveState(); render(); },
   }));
   row.appendChild(q.owned.shield
     ? chipBtn('Shield', { on: L.shieldOn, locked: superOn, onclick: () => setLoadout({ shieldOn: !L.shieldOn }) })

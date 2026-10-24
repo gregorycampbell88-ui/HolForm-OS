@@ -974,3 +974,56 @@ main {
 .inv-sub { font-size: 0.68rem; color: var(--mid-gray); }
 .inv-on .inv-name { color: var(--green); }
 .q-inventory > .q-btn { margin-top: 10px; }
+
+/* Back to Action: a Dragon Ball style power-up aura in the suit color */
+.art-powerup { position: absolute; left: 50%; bottom: 2%; width: 86%; height: 98%; transform: translateX(-50%); pointer-events: none; opacity: 0; }
+.fx-powerup .art-powerup { animation: auraLife 1.9s ease-out forwards; }
+.art-powerup .flame-a, .art-powerup .flame-b {
+  position: absolute; left: 50%; bottom: 0; transform-origin: 50% 100%;
+  clip-path: polygon(50% 0, 57% 15%, 65% 5%, 71% 24%, 83% 14%, 85% 40%, 100% 36%, 92% 68%, 98% 100%, 2% 100%, 8% 68%, 0 36%, 15% 40%, 17% 14%, 29% 24%, 35% 5%, 43% 15%);
+}
+.art-powerup .flame-a {
+  width: 100%; height: 100%; margin-left: -50%;
+  background: radial-gradient(ellipse at 50% 72%, var(--aura-core) 0%, var(--aura) 52%, transparent 88%);
+  filter: blur(3px) drop-shadow(0 0 10px var(--aura));
+  animation: flameA 0.22s ease-in-out infinite alternate;
+}
+.art-powerup .flame-b {
+  width: 62%; height: 78%; margin-left: -31%;
+  background: radial-gradient(ellipse at 50% 80%, #fff 0%, var(--aura-core) 45%, transparent 80%);
+  opacity: 0.85;
+  animation: flameB 0.17s ease-in-out infinite alternate;
+}
+.art-powerup i {
+  position: absolute; bottom: 8%; width: 3.2%; aspect-ratio: 1; border-radius: 50%;
+  background: var(--aura-core); box-shadow: 0 0 8px 2px var(--aura); opacity: 0;
+  animation: sparkRise 1.1s ease-out infinite;
+}
+@keyframes auraLife {
+  0% { opacity: 0; transform: translateX(-50%) scale(0.55); }
+  18% { opacity: 1; transform: translateX(-50%) scale(1.08); }
+  75% { opacity: 1; transform: translateX(-50%) scale(1); }
+  100% { opacity: 0; transform: translateX(-50%) scale(1.12); }
+}
+@keyframes flameA { from { transform: scaleY(0.93) scaleX(1.03); } to { transform: scaleY(1.07) scaleX(0.96); } }
+@keyframes flameB { from { transform: scaleY(1.06) scaleX(0.96); } to { transform: scaleY(0.9) scaleX(1.05); } }
+@keyframes sparkRise {
+  0% { opacity: 0; transform: translateY(0) scale(0.6); }
+  20% { opacity: 1; }
+  100% { opacity: 0; transform: translateY(-520%) scale(0.2); }
+}
+.art-scene.fx-powerup::after {
+  background: radial-gradient(circle at 50% 55%, var(--aura-core), transparent 62%);
+  animation: fxFlash 0.55s ease-out;
+}
+.art-scene.fx-powerup .art-figure { animation: fxCharge 1.5s ease-out; }
+.art-scene.fx-powerup .art-ranger { filter: drop-shadow(0 0 7px var(--aura)); }
+@keyframes fxCharge {
+  0% { transform: scale(0.97); }
+  10%, 30%, 50% { transform: translateX(-1.2%) scale(1.01); }
+  20%, 40%, 60% { transform: translateX(1.2%) scale(1.01); }
+  75% { transform: scale(1.06); }
+  100% { transform: scale(1); }
+}
+@media (prefers-reduced-motion: reduce) { .art-powerup, .art-powerup * { animation: none !important; } }
+.reduce-motion .art-powerup, .reduce-motion .art-powerup * { animation: none !important; }

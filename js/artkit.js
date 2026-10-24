@@ -160,7 +160,7 @@ const ArtKit = (() => {
 
     // Compose the scene. Returns null when no art exists at all (caller falls back
     // to the drawn ranger); returns the frame without a ranger while it is loading.
-    // `fx` ('morph' | 'power' | 'pop') plays a one-shot effect on this render.
+    // `fx` ('powerup' | 'morph' | 'power' | 'pop') plays a one-shot effect on this render.
     sceneHTML(a, q, fx) {
       const L = q.loadout;
       const suitHex = (SUITS.find((s) => s.id === a.suit) || SUITS[0]).color;
@@ -198,7 +198,14 @@ const ArtKit = (() => {
       const has = (main && baked[main]) || { weapon: false, holster: false };
 
       const slice = (inner) => `viewBox="0 0 ${GW} ${GH}" preserveAspectRatio="xMidYMid slice" shape-rendering="crispEdges">${inner}`;
-      let html = `<div class="art-scene${fx ? ' fx-' + fx : ''}" role="img" aria-label="Your ranger">`;
+      // power-up aura: the suit color, brightened enough to show on a dark scene, with a pale core
+      const mix = (rgb, to, t) => rgb.map((c, i) => Math.round(c + (to[i] - c) * t));
+      const suitRgb = hexToRgb(suitHex);
+      const lum = (0.299 * suitRgb[0] + 0.587 * suitRgb[1] + 0.114 * suitRgb[2]) / 255;
+      const auraRgb = lum < 0.35 ? mix(suitRgb, [255, 255, 255], 0.4) : suitRgb;
+      const coreRgb = mix(auraRgb, [255, 255, 255], 0.65);
+      const auraVars = `--aura:rgb(${auraRgb});--aura-core:rgb(${coreRgb})`;
+      let html = `<div class="art-scene${fx ? ' fx-' + fx : ''}" style="${auraVars}" role="img" aria-label="Your ranger">`;
       html += `<svg class="art-bg" ${slice(pxBackground(a.background).svg())}</svg>`;
       if (a.aura && a.aura !== 'none' && a.aura !== 'blaze') {
         const aura = pxAura(a.aura, suitHex);
@@ -216,6 +223,13 @@ const ArtKit = (() => {
       if (superOk && L.superMode === 'battlizer') {
         const bike = pick(['motorcycle']);
         if (bike && bike !== 'wait') html += `<img class="art-bike" alt="" src="${imgs.motorcycle.url}">`;
+      }
+
+      // Back to Action: flames + sparks behind the ranger (only rendered for that one-shot effect)
+      if (fx === 'powerup') {
+        html += '<div class="art-powerup"><span class="flame-a"></span><span class="flame-b"></span>'
+          + [8, 22, 36, 50, 64, 78, 90].map((x, i) => `<i style="left:${x}%;animation-delay:${(i * 0.17).toFixed(2)}s"></i>`).join('')
+          + '</div>';
       }
 
       // the ranger and what he holds move together (effects on art-figure, idle breathing on art-bob)
