@@ -46,6 +46,8 @@ const questUI = {
   customizing: false,
   artOpen: false,
   titlesOpen: false,
+  loadoutOpen: false,
+  shopOpen: true,
   editBudget: 20,
   editFinish: EDIT_DEFAULT_FINISH,
   skipIdx: 0,
@@ -81,6 +83,9 @@ function qDefaults() {
     titles: { unlocked: {}, equipped: 'recruit' },
     newTitles: [],
     stats: qStatsDefault(),
+    owned: {},          // shop purchases (see js/shop.js)
+    ppSpent: 0,         // Power Points spent; balance = earned from levels - spent
+    loadout: shopDefaultLoadout(),
     xp: 0,
     xpAwarded: {},
     tier: 0,
@@ -97,18 +102,32 @@ function qDefaults() {
   };
 }
 
+// Fill in anything missing, IN PLACE. The quest object and its parts keep their
+// identity, so button handlers that captured them never write to a stale copy.
+function qFill(target, defaults) {
+  Object.keys(defaults).forEach((k) => { if (target[k] === undefined) target[k] = defaults[k]; });
+  return target;
+}
+
 function qEnsure() {
-  const d = qDefaults();
-  const q = state.quest && typeof state.quest === 'object' ? state.quest : {};
-  state.quest = Object.assign(d, q);
-  const savedAvatar = q.avatar && q.avatar.v === 2 ? q.avatar : {};
-  state.quest.avatar = Object.assign(qDefaultAvatar(), savedAvatar);
-  state.quest.calTimes = Object.assign(qDefaults().calTimes, q.calTimes || {});
-  state.quest.stats = Object.assign(qStatsDefault(), q.stats || {});
-  state.quest.titles = Object.assign({ unlocked: {}, equipped: 'recruit' }, q.titles || {});
-  if (!Array.isArray(state.quest.newTitles)) state.quest.newTitles = [];
+  if (!state.quest || typeof state.quest !== 'object') state.quest = {};
+  const q = state.quest;
+  qFill(q, qDefaults());
+  // the old cartoon-avatar format (v1) is reset; the ranger format (v2) is topped up
+  if (!q.avatar || typeof q.avatar !== 'object' || q.avatar.v !== 2) q.avatar = qDefaultAvatar();
+  else qFill(q.avatar, qDefaultAvatar());
+  ['calTimes', 'stats', 'titles', 'loadout', 'owned'].forEach((k) => {
+    if (!q[k] || typeof q[k] !== 'object') q[k] = qDefaults()[k];
+  });
+  qFill(q.calTimes, qDefaults().calTimes);
+  qFill(q.stats, qStatsDefault());
+  qFill(q.titles, { unlocked: {}, equipped: 'recruit' });
+  qFill(q.loadout, shopDefaultLoadout());
+  if (!Array.isArray(q.newTitles)) q.newTitles = [];
+  if (typeof q.ppSpent !== 'number') q.ppSpent = 0;
   if (!state.weeklyAdjustments) state.weeklyAdjustments = {};
   qSanitizeAvatar();
+  shopSanitize(q);
 }
 
 // ---- titles (catalog lives in js/titles.js; locked ones are never displayed) ----
@@ -233,8 +252,10 @@ function awardXp(amount, key, date) {
   const after = levelInfo(q.xp).level;
   if (after > before) {
     const unlocks = [];
-    for (let l = before + 1; l <= after; l++) unlocks.push(...unlocksAtLevel(l));
-    q.levelUp = { to: after, unlocks };
+    let pp = 0;
+    for (let l = before + 1; l <= after; l++) { unlocks.push(...unlocksAtLevel(l)); pp += ppForLevel(l); }
+    if (before < TIGER_PACK_LEVEL && after >= TIGER_PACK_LEVEL) unlocks.push('Tiger pack: Short Swords + Tiger beast');
+    q.levelUp = { to: after, unlocks, pp };
   }
   // keep the dedupe map small
   const keys = Object.keys(q.xpAwarded).sort();
@@ -530,10 +551,12 @@ function renderQuest() {
   if (q.newTitles.length) c.appendChild(renderNewTitle());
   if (questUI.result) c.appendChild(renderResult());
   if (questUI.nextAnchor) c.appendChild(renderNextAnchor());
+  if (artActive()) c.appendChild(renderFormToggles());
   c.appendChild(renderSessionPanel());
   c.appendChild(renderMissionPanel());
   const extras = renderSavedAndConvos();
   if (extras) c.appendChild(extras);
+  if (artActive()) { c.appendChild(renderLoadout()); c.appendChild(renderShop()); }
   c.appendChild(renderTitles());
   c.appendChild(renderCalendarCard());
   c.appendChild(renderRecentLog());
@@ -579,31 +602,35 @@ function renderTitles() {
   return det;
 }
 
-// Your imported art (device-only) when present, otherwise the drawn pixel ranger.
+// Your sprites from the art/ folder when present, otherwise the drawn pixel ranger.
 function artActive() { return typeof ArtKit !== 'undefined' && ArtKit.active(state.quest.avatar); }
 function avatarHTML(a) {
-  // hold an empty frame until the art finishes loading, so the drawn ranger doesn't flash
-  if (typeof ArtKit !== 'undefined' && !ArtKit.ready) return '<div class="art-scene" aria-hidden="true"></div>';
-  return artActive() ? ArtKit.sceneHTML(a) : avatarSVG(a);
+  // hold an empty frame until we know whether art exists, so the drawn ranger doesn't flash
+  if (typeof ArtKit !== 'undefined' && !ArtKit.settled()) return '<div class="art-scene" aria-hidden="true"></div>';
+  if (artActive()) {
+    const h = ArtKit.sceneHTML(a, state.quest);
+    if (h !== null) return h;
+  }
+  return avatarSVG(a);
 }
 
 function renderCharacterCard() {
   const q = state.quest;
   const info = levelInfo(q.xp);
   const art = artActive();
-  const canMorph = art && ArtKit.has('rangerOff');
   const buttons = [
     el('button', { class: 'q-btn q-btn-ghost', onclick: () => { questUI.customizing = true; render(); } }, 'Customize'),
   ];
-  if (canMorph) {
+  if (art) {
     buttons.push(el('button', {
       class: 'morpher-btn', 'aria-label': q.avatar.morphed === false ? 'Helmet on' : 'Helmet off',
       onclick: () => { q.avatar.morphed = q.avatar.morphed === false; q.stats.morphs += 1; qCheckTitles(); saveState(); render(); },
     }, [
-      ArtKit.has('morpher') ? el('img', { src: ArtKit.url('morpher'), alt: '' }) : null,
+      ArtKit.url('morpher') ? el('img', { src: ArtKit.url('morpher'), alt: '' }) : null,
       el('span', {}, q.avatar.morphed === false ? 'Morph' : 'Unmorph'),
     ]));
   }
+  const pp = ppBalance(q);
   return el('div', { class: 'q-card q-character' }, [
     el('div', { class: 'avatar-wrap' + (art ? ' art-wrap' : ''), html: avatarHTML(q.avatar) }),
     el('div', { class: 'q-char-info' }, [
@@ -611,10 +638,136 @@ function renderCharacterCard() {
       el('div', { class: 'q-title' }, (titleById(q.titles.equipped) || titleById('recruit')).name),
       el('div', { class: 'xp-bar' }, [el('div', { class: 'xp-fill', style: `width:${info.pct}%` })]),
       el('div', { class: 'q-sub' }, `${info.into} / ${info.need} XP to Level ${info.level + 1}`),
-      el('div', { class: 'q-sub q-dim' }, 'XP is permanent — spending sessions never lowers it.'),
+      el('div', { class: 'pp-badge' }, `⚡ ${pp} Power Point${pp === 1 ? '' : 's'}`),
       el('div', { class: 'q-row q-row-tight' }, buttons),
     ]),
   ]);
+}
+
+// ---- form toggles, loadout, and shop ----
+
+function chipBtn(label, { on = false, locked = false, onclick = null, title = '' } = {}) {
+  return el('button', {
+    class: 'chip' + (on ? ' chip-on' : '') + (locked ? ' chip-locked' : ''),
+    ...(locked ? { disabled: 'disabled' } : {}),
+    ...(title ? { title } : {}),
+    ...(onclick ? { onclick } : {}),
+  }, label);
+}
+
+function setLoadout(change) {
+  const q = state.quest;
+  Object.assign(q.loadout, change);
+  shopSanitize(q);
+  saveState();
+  render();
+}
+
+// The toggles under the character: helmet, shield, holstered blaster, weapon in hand, super mode.
+function renderFormToggles() {
+  const q = state.quest;
+  const L = q.loadout;
+  const superOn = L.superOn && modesAvailable(q).includes(L.superMode);
+  const modes = modesAvailable(q);
+  const wname = L.weapon ? WEAPON_NAMES[L.weapon] : null;
+  const row = el('div', { class: 'chip-row chip-row-center form-toggles' });
+
+  row.appendChild(chipBtn(q.avatar.morphed === false ? 'Helmet off' : 'Helmet on', {
+    on: q.avatar.morphed !== false, locked: superOn,
+    onclick: () => { q.avatar.morphed = q.avatar.morphed === false; saveState(); render(); },
+  }));
+  row.appendChild(q.owned.shield
+    ? chipBtn('Shield', { on: L.shieldOn, locked: superOn, onclick: () => setLoadout({ shieldOn: !L.shieldOn }) })
+    : chipBtn('Shield 🔒', { locked: true, title: 'Buy it in the shop' }));
+  row.appendChild(q.owned.blaster
+    ? chipBtn('Holstered blaster', { on: L.holster, locked: superOn, onclick: () => setLoadout({ holster: !L.holster }) })
+    : chipBtn('Blaster 🔒', { locked: true, title: 'Buy it in the shop' }));
+  row.appendChild(wname
+    ? chipBtn(`Weapon: ${wname}`, { on: L.weaponHeld, onclick: () => setLoadout({ weaponHeld: !L.weaponHeld }) })
+    : chipBtn('Weapon 🔒', { locked: true, title: 'Unlock a weapon first' }));
+  row.appendChild(modes.length
+    ? chipBtn(superOn ? `Super: ${modeName(L.superMode)}` : 'Super Mode', { on: superOn, onclick: () => setLoadout({ superOn: !L.superOn }) })
+    : chipBtn('Super Mode 🔒', { locked: true, title: 'Buy the Chest Shield first' }));
+  return el('div', { class: 'q-card' }, [row]);
+}
+
+function renderLoadout() {
+  const q = state.quest;
+  const L = q.loadout;
+  const det = el('details', { class: 'q-card q-loadout', ...(questUI.loadoutOpen ? { open: 'open' } : {}) });
+  det.addEventListener('toggle', () => { questUI.loadoutOpen = det.open; });
+  det.appendChild(el('summary', {}, 'Loadout'));
+
+  det.appendChild(el('div', { class: 'q-custom-label' }, 'Emblem'));
+  det.appendChild(el('div', { class: 'chip-row' }, FORMS.filter((f) => emblemOwned(q, f.id)).map((f) =>
+    chipBtn(f.name, { on: L.emblem === f.id, onclick: () => setLoadout({ emblem: f.id, ...(modesAvailable(q).includes(f.mode) ? { superMode: f.mode } : {}) }) }))));
+
+  det.appendChild(el('div', { class: 'q-custom-label' }, 'Weapon'));
+  const wchips = [chipBtn('None', { on: !L.weapon, onclick: () => setLoadout({ weapon: null, weaponHeld: false }) })];
+  ownedWeapons(q).forEach((w) => wchips.push(chipBtn(WEAPON_NAMES[w], { on: L.weapon === w, onclick: () => setLoadout({ weapon: w, weaponHeld: true }) })));
+  det.appendChild(el('div', { class: 'chip-row' }, wchips));
+
+  det.appendChild(el('div', { class: 'q-custom-label' }, 'Super mode'));
+  const modes = modesAvailable(q);
+  det.appendChild(modes.length
+    ? el('div', { class: 'chip-row' }, modes.map((m) => chipBtn(modeName(m), { on: L.superMode === m, onclick: () => setLoadout({ superMode: m, superOn: true }) })))
+    : el('div', { class: 'q-sub q-dim' }, 'Buy the Chest Shield to unlock super modes.'));
+
+  det.appendChild(el('div', { class: 'q-custom-label' }, 'Guardian beast'));
+  const bchips = [chipBtn('None', { on: !L.beast, onclick: () => setLoadout({ beast: null }) })];
+  ownedBeasts(q).forEach((b) => bchips.push(chipBtn(b[0].toUpperCase() + b.slice(1), { on: L.beast === b, onclick: () => setLoadout({ beast: b }) })));
+  if (megazordAvailable(q)) bchips.push(chipBtn('Megazord', { on: L.beast === 'megazord', onclick: () => setLoadout({ beast: 'megazord' }) }));
+  if (ultraAvailable(q)) bchips.push(chipBtn('Ultra Megazord', { on: L.beast === 'ultra', onclick: () => setLoadout({ beast: 'ultra' }) }));
+  det.appendChild(el('div', { class: 'chip-row' }, bchips));
+  det.appendChild(el('div', { class: 'q-sub q-dim' }, `Beasts: ${ownedBeasts(q).length} of 6. Five unlock the Megazord; all six unlock the Ultra Megazord.`));
+  return det;
+}
+
+function renderShop() {
+  const q = state.quest;
+  const bal = ppBalance(q);
+  const det = el('details', { class: 'q-card q-shop', ...(questUI.shopOpen ? { open: 'open' } : {}) });
+  det.addEventListener('toggle', () => { questUI.shopOpen = det.open; });
+  det.appendChild(el('summary', {}, `Power shop · ⚡ ${bal}`));
+  det.appendChild(el('div', { class: 'q-sub q-dim' }, 'Level-ups give Power Points. Spending them never lowers your level.'));
+
+  // free unlock (not bought with points)
+  const packOwned = tigerPackOwned(q);
+  det.appendChild(el('div', { class: 'q-shop-row' }, [
+    el('div', { class: 'q-shop-text' }, [
+      el('div', { class: 'q-title-name' }, 'Tiger pack'),
+      el('div', { class: 'q-dim' }, `Short Swords + Tiger guardian beast. Free at Level ${TIGER_PACK_LEVEL}.`),
+    ]),
+    el('span', { class: 'q-shop-state' }, packOwned ? 'Unlocked ✓' : `Level ${TIGER_PACK_LEVEL}`),
+  ]));
+
+  SHOP.forEach((item) => {
+    const owned = !!q.owned[item.id];
+    const c = shopCanBuy(q, item.id);
+    det.appendChild(el('div', { class: 'q-shop-row' }, [
+      el('div', { class: 'q-shop-text' }, [
+        el('div', { class: 'q-title-name' }, item.name),
+        el('div', { class: 'q-dim' }, item.desc),
+        !owned && !c.ok ? el('div', { class: 'q-shop-reason' }, c.reason) : null,
+      ]),
+      owned
+        ? el('span', { class: 'q-shop-state' }, 'Owned ✓')
+        : el('button', {
+          class: 'q-btn q-btn-small',
+          ...(c.ok ? {} : { disabled: 'disabled' }),
+          onclick: () => { if (shopBuy(q, item.id)) { qCheckTitles(); saveState(); render(); } },
+        }, `⚡ ${item.cost}`),
+    ]));
+  });
+
+  det.appendChild(el('div', { class: 'q-shop-row' }, [
+    el('div', { class: 'q-shop-text' }, [
+      el('div', { class: 'q-title-name' }, 'Megazord · Ultra Megazord'),
+      el('div', { class: 'q-dim' }, 'Unlock automatically: five beasts for the Megazord, all six for the Ultra.'),
+    ]),
+    el('span', { class: 'q-shop-state' }, ultraAvailable(q) ? 'Ultra ✓' : megazordAvailable(q) ? 'Megazord ✓' : `${ownedBeasts(q).length}/6`),
+  ]));
+  return det;
 }
 
 function renderLevelUp() {
@@ -622,6 +775,7 @@ function renderLevelUp() {
   return el('div', { class: 'q-card q-levelup' }, [
     el('div', { class: 'q-kicker' }, 'LEVEL UP'),
     el('div', { class: 'q-big' }, `You reached Level ${lu.to}`),
+    lu.pp ? el('div', { class: 'q-sub' }, `+${lu.pp} Power Point${lu.pp === 1 ? '' : 's'} to spend in the shop`) : null,
     lu.unlocks.length ? el('div', { class: 'q-sub' }, 'New to try: ' + lu.unlocks.join(', ')) : null,
     el('button', { class: 'q-btn', onclick: () => { state.quest.levelUp = null; saveState(); render(); } }, 'Nice'),
   ]);
@@ -980,8 +1134,9 @@ function renderFaceControls(preview) {
   return box;
 }
 
-// In art mode only some categories apply to the flat artwork.
-const ART_ALLOWED = { suit: null, trim: null, weapon: ['none', 'blade'], beast: ['none', 'tiger'], aura: null, background: null };
+// With your art, gear comes from the shop/loadout. The customizer keeps the
+// color and look options that still apply: suit, trim, background, and glow effects.
+const ART_ALLOWED = { suit: null, trim: null, aura: ['none', 'glow', 'bolt', 'legend'], background: null };
 
 function customizerSections(onboarding) {
   const art = artActive();
@@ -990,54 +1145,13 @@ function customizerSections(onboarding) {
     if (onboarding && !s.onboarding) return;
     if (!art) { out.push(s); return; }
     if (!(s.key in ART_ALLOWED)) return;
-    let allow = ART_ALLOWED[s.key];
-    if (s.key === 'weapon' && !ArtKit.has('sword')) allow = ['none'];
-    if (s.key === 'beast' && !ArtKit.has('beast')) allow = ['none'];
+    const allow = ART_ALLOWED[s.key];
     const items = allow ? s.items.filter((i) => allow.includes(i.id)) : s.items;
     if (items.length > 1 || s.key === 'suit' || s.key === 'trim') out.push({ ...s, items });
   });
   return out;
 }
 
-function renderArtImport() {
-  const det = el('details', {
-    class: 'q-card q-art',
-    ...(questUI.artOpen || !ArtKit.has('ranger') ? { open: 'open' } : {}),
-  });
-  det.addEventListener('toggle', () => { questUI.artOpen = det.open; });
-  det.appendChild(el('summary', {}, ArtKit.has('ranger') ? 'Your art kit ✓' : 'Art kit'));
-  const msg = el('div', { class: 'q-sub q-dim' }, 'Your art is built in and loads on every device. You can swap any piece below; a swap stays on this device only. × returns to the built-in piece.');
-  det.appendChild(msg);
-
-  ART_SLOTS.forEach((slot) => {
-    const input = el('input', {
-      type: 'file', accept: 'image/*', class: 'hidden',
-      onchange: (e) => {
-        const f = e.target.files && e.target.files[0];
-        if (!f) return;
-        ArtKit.put(slot.key, f).then(() => render()).catch((err) => { msg.textContent = err.message; msg.classList.remove('q-dim'); });
-      },
-    });
-    det.appendChild(el('div', { class: 'q-art-row' }, [
-      ArtKit.has(slot.key) ? el('img', { class: 'q-art-thumb', src: ArtKit.url(slot.key), alt: '' }) : el('span', { class: 'q-art-thumb q-art-empty' }, '—'),
-      el('div', { class: 'q-art-name' }, [
-        el('div', {}, slot.label),
-        el('div', { class: 'q-dim' }, ArtKit.has(slot.key) ? (ArtKit.isBuiltIn(slot.key) ? 'Built in' : 'Swapped on this device') : slot.hint),
-      ]),
-      input,
-      el('button', { class: 'q-btn q-btn-small', onclick: () => input.click() }, ArtKit.has(slot.key) ? 'Swap' : 'Choose'),
-      ArtKit.has(slot.key) && !ArtKit.isBuiltIn(slot.key) ? el('button', { class: 'q-btn q-btn-small q-btn-ghost', onclick: () => ArtKit.remove(slot.key).then(() => render()) }, '×') : null,
-    ]));
-  });
-  if (ArtKit.has('ranger')) {
-    const on = state.quest.avatar.useArt !== false;
-    det.appendChild(el('button', {
-      class: 'chip',
-      onclick: () => { state.quest.avatar.useArt = !on; saveState(); render(); },
-    }, on ? 'Using my art — tap for drawn ranger' : 'Using drawn ranger — tap for my art'));
-  }
-  return det;
-}
 
 function renderCustomizer(onboarding) {
   const q = state.quest;
@@ -1046,17 +1160,14 @@ function renderCustomizer(onboarding) {
   const wrap = el('div', { class: 'q-customizer' });
   wrap.appendChild(el('div', { class: 'q-section-title' }, onboarding ? 'Build your ranger' : 'Customize your ranger'));
   if (onboarding) wrap.appendChild(el('div', { class: 'q-sub' }, art
-    ? 'Pick your suit and trim colors to start. Level up to unlock the sword, guardian beast, and power-ups.'
+    ? 'Pick your suit and trim colors to start. Level up to earn Power Points for the shield, weapons, emblems, and super modes.'
     : 'Pick your suit, helmet, and emblem to start. Level up to unlock chest shields, weapons, capes, guardian beasts, and power-ups.'));
   const preview = el('div', { class: 'avatar-wrap avatar-preview' + (art ? ' art-wrap' : ''), html: avatarHTML(q.avatar) });
   wrap.appendChild(preview);
-  if (!art || ArtKit.has('rangerOff')) {
-    wrap.appendChild(el('div', { class: 'chip-row chip-row-center' }, [
-      el('button', { class: 'chip' + (q.avatar.morphed ? ' chip-on' : ''), onclick: () => { q.avatar.morphed = true; saveState(); render(); } }, 'Helmet on'),
-      el('button', { class: 'chip' + (!q.avatar.morphed ? ' chip-on' : ''), onclick: () => { q.avatar.morphed = false; saveState(); render(); } }, 'Helmet off'),
-    ]));
-  }
-  wrap.appendChild(renderArtImport());
+  wrap.appendChild(el('div', { class: 'chip-row chip-row-center' }, [
+    el('button', { class: 'chip' + (q.avatar.morphed ? ' chip-on' : ''), onclick: () => { q.avatar.morphed = true; saveState(); render(); } }, 'Helmet on'),
+    el('button', { class: 'chip' + (!q.avatar.morphed ? ' chip-on' : ''), onclick: () => { q.avatar.morphed = false; saveState(); render(); } }, 'Helmet off'),
+  ]));
   if (!art) wrap.appendChild(renderFaceControls(preview));
 
   customizerSections(onboarding).forEach((sec) => {

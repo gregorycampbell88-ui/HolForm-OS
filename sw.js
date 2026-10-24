@@ -1,4 +1,4 @@
-const CACHE = 'holform-os-v20';
+const CACHE = 'holform-os-v24';
 const ASSETS = [
   './',
   './index.html',
@@ -8,13 +8,8 @@ const ASSETS = [
   './js/face.js',
   './js/avatar.js',
   './js/artkit.js',
-  './art/ranger.png',
-  './art/ranger-off.png',
-  './art/power.webp',
-  './art/beast.webp',
-  './art/sword.png',
-  './art/morpher.png',
   './js/titles.js',
+  './js/shop.js',
   './js/quests.js',
   './js/sync.js',
   './js/firebase-config.js',

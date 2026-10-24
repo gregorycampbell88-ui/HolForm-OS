@@ -2,3 +2,6 @@
 
 # private local test copies of personal art (never commit)
 .test-art/
+
+# sprites waiting to be sorted (not published until moved into art/)
+art-inbox/

@@ -72,8 +72,13 @@ const TITLES = [
   { id: 'one-small-change', name: 'One Small Change', desc: 'Chose an adjustment for next week.', test: (c) => c.adjustments >= 1 },
   { id: 'course-corrector', name: 'Course Corrector', desc: 'Reflected on four different weeks.', test: (c) => c.reflections >= 4 },
 
-  // ---- gear ----
-  { id: 'power-surge', name: 'Power Surge', desc: 'Lit up Blazing Mode.', test: (c) => c.state.quest.avatar.aura === 'blaze' },
-  { id: 'beastmaster', name: 'Beastmaster', desc: 'Called your guardian beast.', test: (c) => c.state.quest.avatar.beast === 'tiger' },
-  { id: 'sword-bearer', name: 'Sword Bearer', desc: 'Drew the Guardian Blade.', test: (c) => c.state.quest.avatar.weapon === 'blade' },
+  // ---- gear and forms ----
+  { id: 'power-surge', name: 'Power Surge', desc: 'Powered up into a super mode.', test: (c) => !!(c.q.loadout.superOn && c.q.loadout.superMode) },
+  { id: 'beastmaster', name: 'Beastmaster', desc: 'Called your guardian beast.', test: (c) => !!c.q.loadout.beast },
+  { id: 'shielded', name: 'Shielded', desc: 'Earned the Chest Shield.', test: (c) => !!c.q.owned.shield },
+  { id: 'two-wheels', name: 'On Two Wheels', desc: 'Got the motorcycle.', test: (c) => !!c.q.owned.bike },
+  { id: 'sword-bearer', name: 'Sword Bearer', desc: 'Earned the Guardian Blade.', test: (c) => ownedWeapons(c.q).includes('guardian-blade') },
+  { id: 'full-arsenal', name: 'Full Arsenal', desc: 'Own every weapon.', test: (c) => ownedWeapons(c.q).length >= 7 },
+  { id: 'formation', name: 'Formation Commander', desc: 'Five beasts answered the call.', test: (c) => megazordAvailable(c.q) },
+  { id: 'beast-tamer', name: 'Beast Tamer', desc: 'All six guardian beasts. Together.', test: (c) => ultraAvailable(c.q) },
 ];

@@ -888,3 +888,17 @@ main {
 .q-title-name { font-weight: 700; font-size: 0.88rem; }
 .q-newtitle { border-color: var(--warm); }
 .q-newtitle .q-kicker { color: var(--warm); }
+
+/* power points, toggles, loadout, shop, new art layers */
+.pp-badge { display: inline-block; font-size: 0.8rem; font-weight: 700; color: var(--warm); background: var(--charcoal-2); border-radius: 999px; padding: 3px 10px; margin: 0 0 6px; }
+.form-toggles { margin: 0; }
+.art-bike { left: -8%; width: 116%; bottom: 0; }
+.art-holster, .art-weapon { position: absolute; }
+.q-loadout summary, .q-shop summary { cursor: pointer; font-weight: 700; font-size: 0.9rem; margin-bottom: 6px; }
+.q-shop-row { display: flex; align-items: center; gap: 10px; padding: 9px 0; border-top: 1px solid var(--charcoal-2); }
+.q-shop-text { flex: 1; min-width: 0; font-size: 0.8rem; }
+.q-shop-state { font-size: 0.78rem; font-weight: 700; color: var(--green); white-space: nowrap; }
+.q-shop-reason { font-size: 0.74rem; color: var(--warm); margin-top: 2px; }
+.q-title-name { font-weight: 700; font-size: 0.88rem; }
+
+.q-btn:disabled { opacity: 0.4; cursor: not-allowed; }
