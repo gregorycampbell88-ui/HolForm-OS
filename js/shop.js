@@ -62,8 +62,9 @@ function ownedWeapons(q) {
   return out;
 }
 function ownedBeasts(q) { return FORMS.filter((f) => formOwned(q, f.id)).map((f) => f.beast); }
-function megazordAvailable(q) { return ownedBeasts(q).length >= 5; }
-function ultraAvailable(q) { return ownedBeasts(q).length >= 6; }
+// Megazord needs every beast except the Phoenix; the Ultra Megazord needs the Phoenix on top of those.
+function megazordAvailable(q) { const b = ownedBeasts(q); return FORMS.filter((f) => f.id !== 'phoenix').every((f) => b.includes(f.beast)); }
+function ultraAvailable(q) { return megazordAvailable(q) && ownedBeasts(q).includes('phoenix'); }
 
 // Super modes need the shield. Battlizer also needs the motorcycle; each emblem's mode comes with its emblem.
 function modesAvailable(q) {

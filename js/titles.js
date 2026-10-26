@@ -79,6 +79,6 @@ const TITLES = [
   { id: 'two-wheels', name: 'On Two Wheels', desc: 'Got the motorcycle.', test: (c) => !!c.q.owned.bike },
   { id: 'sword-bearer', name: 'Sword Bearer', desc: 'Earned the Guardian Blade.', test: (c) => ownedWeapons(c.q).includes('guardian-blade') },
   { id: 'full-arsenal', name: 'Full Arsenal', desc: 'Own every weapon.', test: (c) => ownedWeapons(c.q).length >= 7 },
-  { id: 'formation', name: 'Formation Commander', desc: 'Five beasts answered the call.', test: (c) => megazordAvailable(c.q) },
+  { id: 'formation', name: 'Formation Commander', desc: 'The first five beasts answered the call.', test: (c) => megazordAvailable(c.q) },
   { id: 'beast-tamer', name: 'Beast Tamer', desc: 'All six guardian beasts. Together.', test: (c) => ultraAvailable(c.q) },
 ];

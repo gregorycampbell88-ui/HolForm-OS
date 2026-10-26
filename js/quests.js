@@ -802,7 +802,7 @@ function renderInventory() {
   })));
   if (megazordAvailable(q)) beasts.push(invTile({ keys: ['megazord'], glyph: INV_GLYPH.megazord, name: 'Megazord', on: L.beast === 'megazord', onclick: () => setLoadout({ beast: 'megazord' }) }));
   if (ultraAvailable(q)) beasts.push(invTile({ keys: ['ultra-megazord'], glyph: INV_GLYPH.megazord, name: 'Ultra Megazord', on: L.beast === 'ultra', onclick: () => setLoadout({ beast: 'ultra' }) }));
-  group('Guardian beast', beasts, `Beasts: ${ownedBeasts(q).length} of 6. Five unlock the Megazord; all six unlock the Ultra Megazord.`);
+  group('Guardian beast', beasts, `Beasts: ${ownedBeasts(q).length} of 6. The first five (all but the Phoenix) unlock the Megazord; add the Phoenix for the Ultra Megazord.`);
 
   // super modes
   const modes = modesAvailable(q);
@@ -857,7 +857,7 @@ function renderShop() {
   det.appendChild(el('div', { class: 'q-shop-row' }, [
     el('div', { class: 'q-shop-text' }, [
       el('div', { class: 'q-title-name' }, 'Megazord · Ultra Megazord'),
-      el('div', { class: 'q-dim' }, 'Unlock automatically: five beasts for the Megazord, all six for the Ultra.'),
+      el('div', { class: 'q-dim' }, 'Unlock automatically: the first five beasts (all but the Phoenix) for the Megazord, then the Phoenix for the Ultra.'),
     ]),
     el('span', { class: 'q-shop-state' }, ultraAvailable(q) ? 'Ultra ✓' : megazordAvailable(q) ? 'Megazord ✓' : `${ownedBeasts(q).length}/6`),
   ]));
