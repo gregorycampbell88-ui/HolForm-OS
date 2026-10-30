@@ -206,7 +206,8 @@ const ArtKit = (() => {
     // is any ranger art present at all? (otherwise the drawn ranger is used)
     hasAny() {
       PRIMARY.forEach(request);
-      request('aura-powerup'); // warm up the power-up burst so it's ready on first use
+      request('aura-powerup'); // warm up the aura bursts so they're ready on first use
+      request('aura-super');
       return PRIMARY.some((k) => !!imgs[k]);
     },
     // true once we know whether the primary ranger images exist (loaded or confirmed missing)
@@ -266,7 +267,9 @@ const ArtKit = (() => {
       const auraRgb = lum < 0.35 ? mix(suitRgb, [255, 255, 255], 0.4) : suitRgb;
       const coreRgb = mix(auraRgb, [255, 255, 255], 0.65);
       const auraVars = `--aura:rgb(${auraRgb});--aura-core:rgb(${coreRgb})`;
-      let html = `<div class="art-scene${fx ? ' fx-' + fx : ''}" style="${auraVars}" role="img" aria-label="Your ranger">`;
+      // super mode reuses the power-up flash + charge, with its own wider aura art
+      const fxClass = fx ? ' fx-' + fx + (fx === 'superup' ? ' fx-powerup' : '') : '';
+      let html = `<div class="art-scene${fxClass}" style="${auraVars}" role="img" aria-label="Your ranger">`;
       html += `<svg class="art-bg" ${slice(pxBackground(a.background).svg())}</svg>`;
       if (a.aura && a.aura !== 'none' && a.aura !== 'blaze') {
         const aura = pxAura(a.aura, suitHex);
@@ -289,6 +292,10 @@ const ArtKit = (() => {
       // Back to Action: your aura art bursts up behind the ranger (only rendered for that one-shot effect)
       if (fx === 'powerup' && imgs['aura-powerup']) {
         html += `<img class="art-powerup" alt="" src="${tinted('aura-powerup', auraRgb)}">`;
+      }
+      // Super Mode: the wider aura that fits the frame
+      if (fx === 'superup' && imgs['aura-super']) {
+        html += `<img class="art-superaura" alt="" src="${tinted('aura-super', auraRgb)}">`;
       }
 
       // the ranger and what he holds move together (effects on art-figure, idle breathing on art-bob)

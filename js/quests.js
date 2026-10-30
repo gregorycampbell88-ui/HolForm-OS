@@ -626,8 +626,8 @@ function scheduleClearFx() {
   clearTimeout(fxTimer);
   fxTimer = setTimeout(() => {
     document.querySelectorAll('.art-scene').forEach((s) => {
-      s.classList.remove('fx-morph', 'fx-powerup', 'fx-power', 'fx-pop');
-      s.querySelectorAll('.art-powerup').forEach((n) => n.remove());
+      s.classList.remove('fx-morph', 'fx-powerup', 'fx-superup', 'fx-power', 'fx-pop');
+      s.querySelectorAll('.art-powerup, .art-superaura').forEach((n) => n.remove());
     });
   }, 1000);
 }
@@ -682,9 +682,14 @@ function chipBtn(label, { on = false, locked = false, onclick = null, title = ''
 
 function setLoadout(change) {
   const q = state.quest;
-  questUI.fx = ('superOn' in change || 'superMode' in change) ? 'power' : 'pop';
+  const wasSuper = q.loadout.superOn && modesAvailable(q).includes(q.loadout.superMode);
+  const wasMode = q.loadout.superMode;
   Object.assign(q.loadout, change);
   shopSanitize(q);
+  const isSuper = q.loadout.superOn && modesAvailable(q).includes(q.loadout.superMode);
+  // super mode switching on (or to another mode) gets the big aura burst; switching off keeps the old flash
+  if (isSuper && (!wasSuper || q.loadout.superMode !== wasMode)) questUI.fx = 'superup';
+  else questUI.fx = ('superOn' in change || 'superMode' in change) ? 'power' : 'pop';
   saveState();
   render();
 }
