@@ -1015,3 +1015,14 @@ main {
 .fx-superup .art-superaura { animation: auraBurst 0.85s ease-out both; }
 @media (prefers-reduced-motion: reduce) { .art-superaura { animation: none !important; } }
 .reduce-motion .art-superaura { animation: none !important; }
+
+/* chosen aura (Power Glow / Lightning / Legendary Surge): your art behind the ranger, gently pulsing */
+.art-auraimg { position: absolute; left: 50%; bottom: -2%; transform: translateX(-50%); pointer-events: none; animation: auraImgPulse 3.2s ease-in-out infinite; }
+.aura-img-glow, .aura-img-bolt { height: 104%; width: auto; }
+.aura-img-legend { width: 104%; height: auto; }
+@keyframes auraImgPulse {
+  0%, 100% { opacity: 0.8; transform: translateX(-50%) scale(1); }
+  50% { opacity: 1; transform: translateX(-50%) scale(1.025); }
+}
+@media (prefers-reduced-motion: reduce) { .art-auraimg { animation: none; } }
+.reduce-motion .art-auraimg { animation: none !important; }

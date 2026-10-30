@@ -81,7 +81,7 @@ const AURAS = [
   { id: 'glow', label: 'Power Glow', lv: 2 },
   { id: 'blaze', label: 'Blazing Mode', lv: 5 },
   { id: 'bolt', label: 'Lightning', lv: 8 },
-  { id: 'legend', label: 'Legend Surge', lv: 11 },
+  { id: 'legend', label: 'Legendary Surge', lv: 11 },
 ];
 const BACKGROUNDS = [
   { id: 'plain', label: 'Plain', lv: 1 },
@@ -154,7 +154,7 @@ const CATALOG_SECTIONS = [
   { key: 'weapon', label: 'Weapon', items: WEAPONS },
   { key: 'cape', label: 'Cape', items: CAPES },
   { key: 'beast', label: 'Guardian beast', items: BEASTS },
-  { key: 'aura', label: 'Power-up', items: AURAS },
+  { key: 'aura', label: 'Aura', items: AURAS },
   { key: 'background', label: 'Background', items: BACKGROUNDS },
 ];
 

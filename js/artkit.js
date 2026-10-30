@@ -26,6 +26,9 @@ const WEAPON_PLACE = {
 };
 const HOLSTER_PLACE = { left: 55, bottom: 42, width: 16 };
 
+// The aura choices in Customize that have their own art (file art/<name>.webp).
+const AURA_ART = { glow: 'aura-glow', bolt: 'aura-bolt', legend: 'aura-legend' };
+
 // Images that decide whether art mode is available at all.
 const PRIMARY = ['ranger-noshield-helmet-on', 'legacyRanger'];
 
@@ -271,7 +274,12 @@ const ArtKit = (() => {
       const fxClass = fx ? ' fx-' + fx + (fx === 'superup' ? ' fx-powerup' : '') : '';
       let html = `<div class="art-scene${fxClass}" style="${auraVars}" role="img" aria-label="Your ranger">`;
       html += `<svg class="art-bg" ${slice(pxBackground(a.background).svg())}</svg>`;
-      if (a.aura && a.aura !== 'none' && a.aura !== 'blaze') {
+      // chosen aura: your art (tinted to the suit color) when it exists, the drawn one until then
+      const auraKey = AURA_ART[a.aura];
+      if (auraKey) request(auraKey);
+      if (auraKey && imgs[auraKey]) {
+        html += `<img class="art-auraimg aura-img-${a.aura}" alt="" src="${tinted(auraKey, auraRgb)}">`;
+      } else if (a.aura && a.aura !== 'none' && a.aura !== 'blaze' && !(auraKey && status[auraKey] === 'loading')) {
         const aura = pxAura(a.aura, suitHex);
         if (aura) html += `<svg class="art-aura aura-pulse" ${slice(aura.svg())}</svg>`;
       }

@@ -1260,7 +1260,7 @@ function renderCustomizer(onboarding) {
   wrap.appendChild(el('div', { class: 'q-section-title' }, onboarding ? 'Build your ranger' : 'Customize your ranger'));
   if (onboarding) wrap.appendChild(el('div', { class: 'q-sub' }, art
     ? 'Pick your suit and trim colors to start. Level up to earn Power Points for the shield, weapons, emblems, and super modes.'
-    : 'Pick your suit, helmet, and emblem to start. Level up to unlock chest shields, weapons, capes, guardian beasts, and power-ups.'));
+    : 'Pick your suit, helmet, and emblem to start. Level up to unlock chest shields, weapons, capes, guardian beasts, and auras.'));
   const preview = el('div', { class: 'avatar-wrap avatar-preview' + (art ? ' art-wrap' : ''), html: avatarHTML(q.avatar) });
   wrap.appendChild(preview);
   wrap.appendChild(el('div', { class: 'chip-row chip-row-center' }, [
