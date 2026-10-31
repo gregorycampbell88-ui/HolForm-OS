@@ -27,6 +27,8 @@ const WEAPON_PLACE = {
 const HOLSTER_PLACE = { left: 55, bottom: 42, width: 16 };
 
 // The aura choices in Customize that have their own art (file art/<name>.webp).
+// Backgrounds that are full pictures (file art/<name>.webp), drawn behind everything else.
+const BG_ART = { temple: 'bg-temple', sanctum: 'bg-sanctum' };
 const AURA_ART = { glow: 'aura-glow', bolt: 'aura-bolt', legend: 'aura-legend', legend2: 'aura-legend2' };
 
 // Images that decide whether art mode is available at all.
@@ -273,7 +275,10 @@ const ArtKit = (() => {
       // super mode reuses the power-up flash + charge, with its own wider aura art
       const fxClass = fx ? ' fx-' + fx + (fx === 'superup' ? ' fx-powerup' : '') : '';
       let html = `<div class="art-scene${fxClass}" style="${auraVars}" role="img" aria-label="Your ranger">`;
-      html += `<svg class="art-bg" ${slice(pxBackground(a.background).svg())}</svg>`;
+      const bgKey = BG_ART[a.background];
+      if (bgKey) request(bgKey);
+      if (bgKey && imgs[bgKey]) html += `<img class="art-bgimg" alt="" src="${imgs[bgKey].url}">`;
+      else html += `<svg class="art-bg" ${slice(pxBackground(bgKey ? 'plain' : a.background).svg())}</svg>`;
       // chosen aura: your art (tinted to the suit color) when it exists, the drawn one until then
       const auraKey = AURA_ART[a.aura];
       if (auraKey) request(auraKey);

@@ -91,6 +91,8 @@ const BACKGROUNDS = [
   { id: 'stars', label: 'Stars', lv: 6 },
   { id: 'forest', label: 'Forest', lv: 8 },
   { id: 'arena', label: 'Arena', lv: 10 },
+  { id: 'temple', label: 'Emerald Temple', lv: 12 },
+  { id: 'sanctum', label: 'Crystal Sanctum', lv: 14 },
 ];
 // Unmasked look (shown when the helmet is off)
 const CHARS = [

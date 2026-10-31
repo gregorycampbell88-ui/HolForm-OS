@@ -1026,3 +1026,6 @@ main {
 }
 @media (prefers-reduced-motion: reduce) { .art-auraimg { animation: none; } }
 .reduce-motion .art-auraimg { animation: none !important; }
+
+/* picture backgrounds (Emerald Temple, Crystal Sanctum) */
+.art-bgimg { inset: 0; width: 100%; height: 100%; object-fit: cover; }
