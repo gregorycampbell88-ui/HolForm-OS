@@ -204,6 +204,9 @@ function qSanitizeAvatar() {
   const a = state.quest.avatar;
   const level = levelInfo(state.quest.xp).level;
   const def = qDefaultAvatar();
+  // the first names these two backgrounds had, in case one was already picked
+  if (a.background === 'temple') a.background = 'city';
+  if (a.background === 'sanctum') a.background = 'city-inside';
   CATALOG_SECTIONS.forEach((s) => {
     const cur = s.items.find((i) => i.id === a[s.key]);
     if (cur && cur.lv <= level) return;

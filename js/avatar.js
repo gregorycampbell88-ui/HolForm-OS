@@ -87,12 +87,11 @@ const AURAS = [
 const BACKGROUNDS = [
   { id: 'plain', label: 'Plain', lv: 1 },
   { id: 'sunrise', label: 'Sunrise', lv: 2 },
-  { id: 'city', label: 'Command Center', lv: 4 },
+  { id: 'city', label: 'Command Center (Outside)', lv: 4 },
+  { id: 'city-inside', label: 'Command Center (Inside)', lv: 6 },
   { id: 'stars', label: 'Stars', lv: 6 },
   { id: 'forest', label: 'Forest', lv: 8 },
   { id: 'arena', label: 'Arena', lv: 10 },
-  { id: 'temple', label: 'Emerald Temple', lv: 12 },
-  { id: 'sanctum', label: 'Crystal Sanctum', lv: 14 },
 ];
 // Unmasked look (shown when the helmet is off)
 const CHARS = [
@@ -303,6 +302,7 @@ function translucent(buf, color, fillA, edgeA) {
 // ---- background / beast / aura ----
 
 function pxBackground(id) {
+  if (id === 'city-inside') id = 'city'; // drawn fallback for the inside view
   const b = new PX();
   const bands = (cols) => {
     const h = GH / cols.length;

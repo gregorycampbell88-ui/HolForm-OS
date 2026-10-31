@@ -28,7 +28,7 @@ const HOLSTER_PLACE = { left: 55, bottom: 42, width: 16 };
 
 // The aura choices in Customize that have their own art (file art/<name>.webp).
 // Backgrounds that are full pictures (file art/<name>.webp), drawn behind everything else.
-const BG_ART = { temple: 'bg-temple', sanctum: 'bg-sanctum' };
+const BG_ART = { city: 'bg-command-outside', 'city-inside': 'bg-command-inside' };
 const AURA_ART = { glow: 'aura-glow', bolt: 'aura-bolt', legend: 'aura-legend', legend2: 'aura-legend2' };
 
 // Images that decide whether art mode is available at all.
@@ -278,7 +278,7 @@ const ArtKit = (() => {
       const bgKey = BG_ART[a.background];
       if (bgKey) request(bgKey);
       if (bgKey && imgs[bgKey]) html += `<img class="art-bgimg" alt="" src="${imgs[bgKey].url}">`;
-      else html += `<svg class="art-bg" ${slice(pxBackground(bgKey ? 'plain' : a.background).svg())}</svg>`;
+      else html += `<svg class="art-bg" ${slice(pxBackground(bgKey && status[bgKey] === 'loading' ? 'plain' : a.background).svg())}</svg>`;
       // chosen aura: your art (tinted to the suit color) when it exists, the drawn one until then
       const auraKey = AURA_ART[a.aura];
       if (auraKey) request(auraKey);
