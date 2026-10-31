@@ -82,6 +82,7 @@ const AURAS = [
   { id: 'blaze', label: 'Blazing Mode', lv: 5 },
   { id: 'bolt', label: 'Lightning', lv: 8 },
   { id: 'legend', label: 'Legendary Surge', lv: 11 },
+  { id: 'legend2', label: 'Legendary Surge II', lv: 15 },
 ];
 const BACKGROUNDS = [
   { id: 'plain', label: 'Plain', lv: 1 },

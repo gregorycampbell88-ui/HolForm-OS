@@ -1235,7 +1235,7 @@ function renderFaceControls(preview) {
 
 // With your art, gear comes from the shop/loadout. The customizer keeps the
 // color and look options that still apply: suit, trim, background, and glow effects.
-const ART_ALLOWED = { suit: null, trim: null, trim2: null, aura: ['none', 'glow', 'bolt', 'legend'], background: null };
+const ART_ALLOWED = { suit: null, trim: null, trim2: null, aura: ['none', 'glow', 'bolt', 'legend', 'legend2'], background: null };
 
 function customizerSections(onboarding) {
   const art = artActive();

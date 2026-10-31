@@ -27,7 +27,7 @@ const WEAPON_PLACE = {
 const HOLSTER_PLACE = { left: 55, bottom: 42, width: 16 };
 
 // The aura choices in Customize that have their own art (file art/<name>.webp).
-const AURA_ART = { glow: 'aura-glow', bolt: 'aura-bolt', legend: 'aura-legend' };
+const AURA_ART = { glow: 'aura-glow', bolt: 'aura-bolt', legend: 'aura-legend', legend2: 'aura-legend2' };
 
 // Images that decide whether art mode is available at all.
 const PRIMARY = ['ranger-noshield-helmet-on', 'legacyRanger'];
