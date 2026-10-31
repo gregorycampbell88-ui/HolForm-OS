@@ -86,7 +86,6 @@ const AURAS = [
 ];
 const BACKGROUNDS = [
   { id: 'plain', label: 'Plain', lv: 1 },
-  { id: 'sunrise', label: 'Sunrise', lv: 2 },
   { id: 'city', label: 'Command Center (Outside)', lv: 4 },
   { id: 'city-inside', label: 'Command Center (Inside)', lv: 6 },
   { id: 'stars', label: 'Stars', lv: 6 },
