@@ -1284,8 +1284,8 @@ function renderCustomizer(onboarding) {
       }, [
         item.color ? el('span', {
           class: 'chip-swatch',
-          // gold and silver show as shiny metal
-          style: ['gold', 'silver'].includes(item.id)
+          // metal swatches: gold and silver suits, every trim except onyx (matte)
+          style: (sec.key === 'suit' ? ['gold', 'silver'].includes(item.id) : (sec.key === 'trim' || sec.key === 'trim2') && item.id !== 'onyx')
             ? `background:linear-gradient(135deg,rgba(255,255,255,0.85),${item.color} 40%,${item.color} 60%,rgba(0,0,0,0.3))`
             : `background:${item.color}`,
         }) : null,

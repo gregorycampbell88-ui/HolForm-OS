@@ -107,15 +107,16 @@ const ArtKit = (() => {
     });
   }
 
-  // Gold and silver get a metallic finish (a polished-metal light ramp), not just a flat color.
-  const METAL = new Set(['#b9c2c8', '#cc9a1a', '#f2c14e', '#cfd6dc']);
+  // Metallic finish (a polished-metal light ramp) for gold and silver suits and every trim except onyx, which stays matte.
+  const METAL_SUIT = new Set(['#b9c2c8', '#cc9a1a']);
+  const METAL_TRIM = new Set(['#f2c14e', '#f4f6f7', '#cfd6dc', '#6b727a']);
 
   function recolored(key, suitHex, trimHex, accentHex = null) {
     const rec = imgs[key];
     if (!rec) return '';
     const keepSuit = suitHex === '#14a85f';
     const keepTrim = trimHex === '#f2c14e';
-    const metalSuit = METAL.has(suitHex), metalTrim = METAL.has(trimHex), metalAccent = !!accentHex && METAL.has(accentHex);
+    const metalSuit = METAL_SUIT.has(suitHex), metalTrim = METAL_TRIM.has(trimHex), metalAccent = !!accentHex && METAL_TRIM.has(accentHex);
     if (keepSuit && keepTrim && !accentHex && !metalTrim) return rec.url;
     const ck = `${key}|${suitHex}|${trimHex}|${accentHex || ""}`;
     if (recolorCache[ck]) return recolorCache[ck];
@@ -252,7 +253,7 @@ const ArtKit = (() => {
       const suitHex = (SUITS.find((s) => s.id === a.suit) || SUITS[0]).color;
       const trimHex = (TRIMS.find((t) => t.id === a.trim) || TRIMS[0]).color;
       const accentOpt = TRIMS2.find((t) => t.id === a.trim2) || TRIMS2[0];
-      const accentHex = accentOpt.id === 'white' ? null : accentOpt.color; // white = the art as drawn
+      const accentHex = accentOpt.color;
       const superOk = L.superOn && modesAvailable(q).includes(L.superMode);
       const helmet = a.morphed !== false ? 'on' : 'off';
       const weapon = L.weaponHeld && L.weapon ? L.weapon : null;
