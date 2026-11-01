@@ -109,7 +109,7 @@ const ArtKit = (() => {
 
   // Metallic finish (a polished-metal light ramp) for gold and silver suits and every trim except graphite and onyx, which stay matte (gunmetal is metallic).
   const METAL_SUIT = new Set(['#b9c2c8', '#cc9a1a']);
-  const METAL_TRIM = new Set(['#f2c14e', '#f4f6f7', '#cfd6dc', '#4b5864']);
+  const METAL_TRIM = new Set(['#f2c14e', '#f4f6f7', '#cfd6dc', '#4b5864', '#111417']);
 
   function recolored(key, suitHex, trimHex, accentHex = null) {
     const rec = imgs[key];
@@ -141,13 +141,14 @@ const ArtKit = (() => {
     // Metal finish: the art's own light and shade is pushed through a steep dark -> color -> bright ramp
     // (deep shadows, a hot near-white highlight, a slight diagonal banding), which reads as polished metal.
     // `shade` = the pixel's lightness relative to the lightness that should come out as the plain color
-    // White is glossy rather than metallic: soft grey shadows, a broad bright body, a crisp white highlight, no banding.
+    // White and black are glossy rather than metallic: soft shadows, a broad body, a crisp highlight, no banding.
     const metalize = (base, shade, x, y) => {
-      if (base[0] > 235 && base[1] > 235 && base[2] > 235) {
-        let g = clamp01(0.62 + (shade - 1) * 1.1);
+      const white = base[0] > 235 && base[1] > 235 && base[2] > 235;
+      if (white || base[0] + base[1] + base[2] < 90) { // white or black gloss
+        let g = white ? clamp01(0.62 + (shade - 1) * 1.1) : clamp01(0.4 + (shade - 0.85) * 1.7);
         g = g * g * (3 - 2 * g);
-        const shadow = base.map((v) => v * 0.6);
-        const [gf, gt, gk] = g < 0.5 ? [shadow, base, g * 2] : [base, [255, 255, 255], (g - 0.5) * 2];
+        const shadow = base.map((v) => v * (white ? 0.6 : 0.5));
+        const [gf, gt, gk] = g < 0.5 ? [shadow, base, g * 2] : [base, white ? [255, 255, 255] : [205, 212, 220], (g - 0.5) * 2];
         return gf.map((v, k) => Math.round(v + (gt[k] - v) * gk));
       }
       let t = clamp01(0.5 + (shade - 1) * 0.6);
