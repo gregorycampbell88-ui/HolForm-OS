@@ -21,13 +21,14 @@ const SUITS = [
   { id: 'onyx', label: 'Onyx', lv: 9, color: '#2b3036' },
   { id: 'emerald', label: 'Emerald', lv: 10, color: '#14a85f' },
 ];
-// Trim: gold to start; white, silver, graphite, then onyx unlock.
+// Trim: gold to start; white, silver, graphite, onyx, then gunmetal unlock.
 const TRIMS = [
   { id: 'gold', label: 'Gold', lv: 1, color: '#f2c14e' },
   { id: 'white', label: 'White', lv: 3, color: '#f4f6f7' },
   { id: 'silver', label: 'Silver', lv: 5, color: '#cfd6dc' },
   { id: 'graphite', label: 'Graphite', lv: 6, color: '#6b727a' },
   { id: 'onyx', label: 'Onyx', lv: 7, color: '#2b3036' },
+  { id: 'gunmetal', label: 'Gunmetal', lv: 8, color: '#4b5864' },
 ];
 // Trim 2 recolors the white parts (boots, gloves, suit accents). Same colors as trim 1;
 // white is the art as drawn, so it is free from the start.
@@ -37,6 +38,7 @@ const TRIMS2 = [
   { id: 'silver', label: 'Silver', lv: 5, color: '#cfd6dc' },
   { id: 'graphite', label: 'Graphite', lv: 6, color: '#6b727a' },
   { id: 'onyx', label: 'Onyx', lv: 7, color: '#2b3036' },
+  { id: 'gunmetal', label: 'Gunmetal', lv: 8, color: '#4b5864' },
 ];
 const HELMETS = [
   { id: 'sentinel', label: 'Sentinel', lv: 1 },
