@@ -141,7 +141,15 @@ const ArtKit = (() => {
     // Metal finish: the art's own light and shade is pushed through a steep dark -> color -> bright ramp
     // (deep shadows, a hot near-white highlight, a slight diagonal banding), which reads as polished metal.
     // `shade` = the pixel's lightness relative to the lightness that should come out as the plain color
+    // White is glossy rather than metallic: soft grey shadows, a broad bright body, a crisp white highlight, no banding.
     const metalize = (base, shade, x, y) => {
+      if (base[0] > 235 && base[1] > 235 && base[2] > 235) {
+        let g = clamp01(0.62 + (shade - 1) * 1.1);
+        g = g * g * (3 - 2 * g);
+        const shadow = base.map((v) => v * 0.6);
+        const [gf, gt, gk] = g < 0.5 ? [shadow, base, g * 2] : [base, [255, 255, 255], (g - 0.5) * 2];
+        return gf.map((v, k) => Math.round(v + (gt[k] - v) * gk));
+      }
       let t = clamp01(0.5 + (shade - 1) * 0.6);
       t = t * t * (3 - 2 * t);
       t = t * t * (3 - 2 * t); // twice: more contrast between the dark and bright bands
