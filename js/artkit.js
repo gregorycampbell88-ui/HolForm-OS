@@ -107,9 +107,9 @@ const ArtKit = (() => {
     });
   }
 
-  // Metallic finish (a polished-metal light ramp) for gold and silver suits and every trim except onyx, which stays matte.
+  // Metallic finish (a polished-metal light ramp) for gold and silver suits and every trim except graphite and onyx, which stay matte.
   const METAL_SUIT = new Set(['#b9c2c8', '#cc9a1a']);
-  const METAL_TRIM = new Set(['#f2c14e', '#f4f6f7', '#cfd6dc', '#6b727a']);
+  const METAL_TRIM = new Set(['#f2c14e', '#f4f6f7', '#cfd6dc']);
 
   function recolored(key, suitHex, trimHex, accentHex = null) {
     const rec = imgs[key];
