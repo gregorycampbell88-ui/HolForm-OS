@@ -107,12 +107,16 @@ const ArtKit = (() => {
     });
   }
 
+  // Gold and silver get a metallic finish (a polished-metal light ramp), not just a flat color.
+  const METAL = new Set(['#b9c2c8', '#cc9a1a', '#f2c14e', '#cfd6dc']);
+
   function recolored(key, suitHex, trimHex, accentHex = null) {
     const rec = imgs[key];
     if (!rec) return '';
     const keepSuit = suitHex === '#14a85f';
     const keepTrim = trimHex === '#f2c14e';
-    if (keepSuit && keepTrim && !accentHex) return rec.url;
+    const metalSuit = METAL.has(suitHex), metalTrim = METAL.has(trimHex), metalAccent = !!accentHex && METAL.has(accentHex);
+    if (keepSuit && keepTrim && !accentHex && !metalTrim) return rec.url;
     const ck = `${key}|${suitHex}|${trimHex}|${accentHex || ""}`;
     if (recolorCache[ck]) return recolorCache[ck];
     const im = rec.im;
@@ -133,13 +137,28 @@ const ArtKit = (() => {
     const mouth = /helmet-on$|^legacyRanger$/.test(key)
       ? { x0: W * 0.44, x1: W * 0.58, y0: c.height * 0.125, y1: c.height * 0.163 } : null;
     const clamp01 = (v) => Math.max(0, Math.min(1, v));
+    // Metal finish: the art's own light and shade is pushed through a steep dark -> color -> bright ramp
+    // (deep shadows, a hot near-white highlight, a slight diagonal banding), which reads as polished metal.
+    // `shade` = the pixel's lightness relative to the lightness that should come out as the plain color
+    const metalize = (base, shade, x, y) => {
+      let t = clamp01(0.5 + (shade - 1) * 0.6);
+      t = t * t * (3 - 2 * t);
+      t = t * t * (3 - 2 * t); // twice: more contrast between the dark and bright bands
+      t = clamp01(t + Math.sin((x + y * 0.7) / W * 22) * 0.05);
+      const dark = base.map((v) => v * 0.3);
+      const hi = base.map((v) => v + (255 - v) * 0.82);
+      const [from, to, f] = t < 0.5 ? [dark, base, t * 2] : [base, hi, (t - 0.5) * 2];
+      return from.map((v, k) => Math.round(v + (to[k] - v) * f));
+    };
     for (let i = 0; i < d.length; i += 4) {
       if (d[i + 3] < 10) continue;
       const r = d[i], g = d[i + 1], b = d[i + 2];
       const [h, s, l] = rgbToHsl(r, g, b);
       let out = null;
-      if (!keepSuit && h >= 75 && h <= 175 && s > 0.25 && l < 0.7) out = tint(suit, l, 0.27);
-      else {
+      if (!keepSuit && h >= 75 && h <= 175 && s > 0.25 && l < 0.7) {
+        out = tint(suit, l, 0.27);
+        if (metalSuit) out = metalize(suit, l / 0.27, (i / 4) % W, Math.floor(i / 4 / W));
+      } else {
         // Gold trim vs white: judged by how colorful the pixel is (HSL saturation is unreliable near white),
         // and blended across the in-between pixels so the two recolors never leave blotchy edges.
         const chroma = Math.max(r, g, b) - Math.min(r, g, b);
@@ -148,8 +167,10 @@ const ArtKit = (() => {
         const wGold = h >= 26 && h <= 58 && l > 0.2 && (h >= 36 || y >= faceRows) ? clamp01((chroma - 30) / 40) : 0;
         const inMouth = mouth && x >= mouth.x0 && x <= mouth.x1 && y >= mouth.y0 && y <= mouth.y1;
         const canAccent = accent && l > 0.58 && chroma < 70 && y >= faceRows && !inMouth;
-        const tOut = wGold > 0 ? (keepTrim ? [r, g, b] : tint(trim, l, 0.5)) : null;
-        const aOut = canAccent ? tint(accent, l, 0.92) : [r, g, b];
+        let tOut = wGold > 0 ? (keepTrim ? [r, g, b] : tint(trim, l, 0.5)) : null;
+        let aOut = canAccent ? tint(accent, l, 0.92) : [r, g, b];
+        if (tOut && metalTrim) tOut = metalize(trim, l / 0.5, x, y);
+        if (canAccent && metalAccent) aOut = metalize(accent, l / 0.92, x, y);
         if (wGold >= 1) out = tOut;
         else if (wGold > 0) out = aOut.map((v, k) => Math.round(v + (tOut[k] - v) * wGold));
         else if (canAccent) out = aOut;
@@ -315,8 +336,7 @@ const ArtKit = (() => {
       html += '<div class="art-figure"><div class="art-bob">';
       if (main !== 'wait') {
         const isPower = main === 'legacyPower' || main.startsWith('super-');
-        html += `<img class="art-ranger${isPower ? ' art-power' : ''}" alt="" src="${recolored(main, suitHex, trimHex, accentHex)}">`;
-      }
+        html += `<img class="art-ranger${isPower ? ' art-power' : ''}" alt="" src="${recolored(main, suitHex, trimHex, accentHex)}">`;      }
 
       // holstered blaster + held weapon, only when the ranger photo doesn't already include them
       if (!superOk) {

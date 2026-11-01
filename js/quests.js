@@ -1282,7 +1282,13 @@ function renderCustomizer(onboarding) {
         ...(locked ? { disabled: 'disabled' } : {}),
         onclick: () => { q.avatar[sec.key] = item.id; saveState(); render(); },
       }, [
-        item.color ? el('span', { class: 'chip-swatch', style: `background:${item.color}` }) : null,
+        item.color ? el('span', {
+          class: 'chip-swatch',
+          // gold and silver show as shiny metal
+          style: ['gold', 'silver'].includes(item.id)
+            ? `background:linear-gradient(135deg,rgba(255,255,255,0.85),${item.color} 40%,${item.color} 60%,rgba(0,0,0,0.3))`
+            : `background:${item.color}`,
+        }) : null,
         item.label + (item.blurb ? ` · ${item.blurb}` : '') + (locked ? ` 🔒 Lv ${item.lv}` : ''),
       ]);
     })));
