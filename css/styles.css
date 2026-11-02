@@ -865,13 +865,14 @@ main {
 .art-scene svg, .art-scene img { position: absolute; display: block; }
 .art-bg, .art-aura { inset: 0; width: 100%; height: 100%; }
 .art-beast { left: -12%; width: 124%; bottom: 1%; opacity: 0.96; }
+.art-beast.art-mega { left: -4%; width: 108%; bottom: 4%; }
 .art-ranger { left: 50%; bottom: 3%; height: 90%; width: auto; transform: translateX(-50%); }
 .art-ranger.art-power { height: 96%; bottom: 2%; }
 .art-sword { width: 34%; left: 61%; bottom: 29%; transform-origin: 30% 68%; transform: rotate(-34deg); }
 .avatar-preview.art-wrap { max-width: 260px; flex: none; }
 
 .morpher-btn { display: inline-flex; align-items: center; gap: 6px; background: var(--charcoal-2); border: 1px solid var(--green); color: var(--green); border-radius: 999px; padding: 4px 12px 4px 4px; font-size: 0.8rem; font-weight: 700; cursor: pointer; }
-.morpher-btn img { width: 30px; height: 30px; object-fit: contain; }
+.morpher-btn img { width: 40px; height: 30px; object-fit: contain; }
 .q-row-tight { margin-top: 6px; align-items: center; }
 
 .q-art summary { cursor: pointer; font-weight: 700; font-size: 0.9rem; margin-bottom: 6px; }
@@ -1049,7 +1050,7 @@ div.art-ranger { position: absolute; }
 
 /* roomier ranger frame: keep the narrower info column tidy */
 .q-char-info .morpher-btn { white-space: nowrap; font-size: 0.75rem; padding: 3px 10px 3px 3px; }
-.q-char-info .morpher-btn img { width: 24px; height: 24px; }
+.q-char-info .morpher-btn img { width: 34px; height: 25px; }
 .q-char-info .q-btn { padding-left: 12px; padding-right: 12px; }
 
 /* Super Mode: wider aura art, sized to the frame, same quick burst */

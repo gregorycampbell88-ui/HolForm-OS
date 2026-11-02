@@ -22,7 +22,7 @@ const ART_LEGACY = {
 // First guesses; tune these once the real weapon/holster sprites are in.
 const WEAPON_PLACE = {
   default: { left: 61, bottom: 29, width: 34, rot: -34, origin: '30% 68%' },
-  gun: { left: 62, bottom: 36, width: 24, rot: 0, origin: '30% 60%' },
+  gun: { left: 54, bottom: 41, width: 22, rot: 0, origin: '50% 50%' },
 };
 const HOLSTER_PLACE = { left: 55, bottom: 42, width: 16 };
 
@@ -391,7 +391,7 @@ const ArtKit = (() => {
         const bk = L.beast === 'megazord' ? 'megazord' : L.beast === 'ultra' ? 'ultra-megazord' : `beast-${L.beast}`;
         const bp = pick([bk, L.beast === 'tiger' ? 'legacyBeast' : null].filter(Boolean));
         // beasts and zords wear your suit + trim colors too
-        if (bp && bp !== 'wait') html += `<img class="art-beast" alt="" src="${recolored(bp, suitHex, trimHex)}">`;
+        if (bp && bp !== 'wait') html += `<img class="art-beast${L.beast === 'megazord' || L.beast === 'ultra' ? ' art-mega' : ''}" alt="" src="${recolored(bp, suitHex, trimHex)}">`;
       }
       // motorcycle with Battlizer
       if (superOk && L.superMode === 'battlizer') {

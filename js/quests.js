@@ -647,11 +647,13 @@ function renderCharacterCard() {
   questUI.fx = null;
   if (fx) scheduleClearFx();
   if (art) {
+    // the morpher shown is the one for the emblem you have equipped (the old single morpher until its art arrives)
+    const morpherKey = ArtKit.url('morpher-' + q.loadout.emblem) ? 'morpher-' + q.loadout.emblem : 'morpher';
     buttons.push(el('button', {
       class: 'morpher-btn',
       onclick: () => { q.avatar.morphed = q.avatar.morphed === false; q.stats.morphs += 1; questUI.fx = q.avatar.morphed ? 'powerup' : 'morph'; qCheckTitles(); saveState(); render(); },
     }, [
-      ArtKit.url('morpher') ? el('img', { src: ArtKit.url('morpher'), alt: '' }) : null,
+      ArtKit.url(morpherKey) ? el('img', { src: ArtKit.url(morpherKey), alt: '' }) : null,
       el('span', {}, q.avatar.morphed === false ? 'Back to Action' : 'Power Down'),
     ]));
     buttons.push(el('button', {
@@ -791,7 +793,7 @@ function renderInventory() {
   // gear
   const gear = [];
   if (q.owned.shield) gear.push(invTile({ glyph: INV_GLYPH.shield, name: 'Chest Shield', sub: L.shieldOn ? 'Worn' : 'Off', on: L.shieldOn, onclick: () => setLoadout({ shieldOn: !L.shieldOn }) }));
-  if (q.owned.blaster) gear.push(invTile({ keys: ['holster-gun'], glyph: INV_GLYPH.holster, name: 'Blaster holster', sub: L.holster ? 'On belt' : 'Off', on: L.holster, onclick: () => setLoadout({ holster: !L.holster }) }));
+  if (q.owned.blaster) gear.push(invTile({ keys: ['holster-gun', 'weapon-gun'], glyph: INV_GLYPH.holster, name: 'Blaster holster', sub: L.holster ? 'On belt' : 'Off', on: L.holster, onclick: () => setLoadout({ holster: !L.holster }) }));
   if (q.owned.bike) gear.push(invTile({ keys: ['motorcycle'], glyph: INV_GLYPH.bike, name: 'Motorcycle', sub: 'Battlizer Mode' }));
   if (gear.length) group('Gear', gear);
 
