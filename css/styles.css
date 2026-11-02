@@ -908,8 +908,8 @@ main {
 .art-figure { transform-origin: 50% 96%; }
 .art-bob { transform-origin: 50% 96%; animation: artBreathe 4s ease-in-out infinite; will-change: transform; }
 @keyframes artBreathe {
-  0%, 100% { transform: translateY(0) scale(1); }
-  50% { transform: translateY(-0.7%) scale(1.012); }
+  0%, 100% { transform: translateY(0) scale(1) rotate(-0.45deg); }
+  50% { transform: translateY(-0.7%) scale(1.012) rotate(0.45deg); }
 }
 .art-beast { animation: beastDrift 7s ease-in-out infinite; }
 @keyframes beastDrift {
