@@ -32,7 +32,7 @@ const BG_ART = { city: 'bg-command-outside', 'city-inside': 'bg-command-inside' 
 const AURA_ART = { glow: 'aura-glow', bolt: 'aura-bolt', legend: 'aura-legend', legend2: 'aura-legend2' };
 
 // Images that decide whether art mode is available at all.
-const PRIMARY = ['ranger-noshield-helmet-on', 'legacyRanger'];
+const PRIMARY = ['ranger-tiger-noshield-helmet-on', 'legacyRanger'];
 
 const ArtKit = (() => {
   const imgs = {};   // key -> { im, url }
@@ -336,7 +336,7 @@ const ArtKit = (() => {
       const holsterWanted = !superOk && !!(L.holster && q.owned.blaster);
       // Regular form: a ready-made photo that already holds the weapon / holster is best
       // (nothing floats on top); if it doesn't exist the plain ranger + overlays are used.
-      // name = ranger-<emblem|noshield>[-<weapon>][-holster]-helmet-<on|off>
+      // name = ranger-<emblem>[-noshield][-<weapon>][-holster]-helmet-<on|off>   (no shield: the chest roundel still shows the emblem)
       const baked = {}; // key -> what that image already includes
       let mainKeys;
       if (superOk) {
@@ -347,7 +347,7 @@ const ArtKit = (() => {
           const key = ['ranger', b, w, h ? 'holster' : null, `helmet-${helmet}`].filter(Boolean).join('-');
           if (!baked[key]) { baked[key] = { weapon: !!w, holster: !!h }; mainKeys.push(key); }
         };
-        const bases = L.shieldOn && q.owned.shield ? [L.emblem, 'noshield'] : ['noshield'];
+        const bases = L.shieldOn && q.owned.shield ? [L.emblem, `${L.emblem}-noshield`, 'noshield'] : [`${L.emblem}-noshield`, 'noshield'];
         bases.forEach((b) => {
           if (weapon && holsterWanted) add(b, weapon, true);
           if (weapon) add(b, weapon, false);
