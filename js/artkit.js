@@ -111,32 +111,19 @@ const ArtKit = (() => {
   const METAL_SUIT = new Set(['#b9c2c8', '#cc9a1a']);
   const METAL_TRIM = new Set(['#f2c14e', '#f4f6f7', '#cfd6dc', '#4b5864', '#111417']);
 
-  function recolored(key, suitHex, trimHex, accentHex = null) {
-    const rec = imgs[key];
-    if (!rec) return '';
+  // Recolors one picture's pixels in place (ImageData holding a single sprite).
+  function recolorPixels(data, key, suitHex, trimHex, accentHex) {
     const keepSuit = suitHex === '#14a85f';
     const keepTrim = trimHex === '#f2c14e';
     const metalSuit = METAL_SUIT.has(suitHex), metalTrim = METAL_TRIM.has(trimHex), metalAccent = !!accentHex && METAL_TRIM.has(accentHex);
-    if (keepSuit && keepTrim && !accentHex && !metalTrim) return rec.url;
-    const ck = `${key}|${suitHex}|${trimHex}|${accentHex || ""}`;
-    if (recolorCache[ck]) return recolorCache[ck];
-    const im = rec.im;
-    // big sprites are only shown a few hundred pixels tall, so recolor a smaller copy (faster on phones)
-    const scale = Math.min(1, 900 / im.naturalHeight);
-    const c = document.createElement('canvas');
-    c.width = Math.round(im.naturalWidth * scale); c.height = Math.round(im.naturalHeight * scale);
-    const ctx = c.getContext('2d');
-    ctx.imageSmoothingQuality = 'high';
-    ctx.drawImage(im, 0, 0, c.width, c.height);
-    const data = ctx.getImageData(0, 0, c.width, c.height);
     const d = data.data;
     const suit = hexToRgb(suitHex), trim = hexToRgb(trimHex), accent = accentHex ? hexToRgb(accentHex) : null;
-    const W = c.width;
+    const W = data.width;
     // trim 2 leaves some white alone: with the helmet off the face area (skin, eyes, teeth),
     // with the helmet on the white mouthpiece
-    const faceRows = /helmet-off$|^legacyRangerOff$/.test(key) ? Math.round(c.height * 0.21) : 0;
+    const faceRows = /helmet-off$|^legacyRangerOff$/.test(key) ? Math.round(data.height * 0.21) : 0;
     const mouth = /helmet-on$|^legacyRanger$/.test(key)
-      ? { x0: W * 0.44, x1: W * 0.58, y0: c.height * 0.125, y1: c.height * 0.163 } : null;
+      ? { x0: W * 0.44, x1: W * 0.58, y0: data.height * 0.125, y1: data.height * 0.17 } : null;
     const clamp01 = (v) => Math.max(0, Math.min(1, v));
     // Metal finish: the art's own light and shade is pushed through a steep dark -> color -> bright ramp
     // (deep shadows, a hot near-white highlight, a slight diagonal banding), which reads as polished metal.
@@ -187,10 +174,89 @@ const ArtKit = (() => {
       }
       if (out) { d[i] = out[0]; d[i + 1] = out[1]; d[i + 2] = out[2]; }
     }
+  }
+
+  function recolored(key, suitHex, trimHex, accentHex = null) {
+    const rec = imgs[key];
+    if (!rec) return '';
+    const ck = `${key}|${suitHex}|${trimHex}|${accentHex || ""}`;
+    if (recolorCache[ck]) return recolorCache[ck];
+    const im = rec.im;
+    // big sprites are only shown a few hundred pixels tall, so recolor a smaller copy (faster on phones)
+    const scale = Math.min(1, 900 / im.naturalHeight);
+    const c = document.createElement('canvas');
+    c.width = Math.round(im.naturalWidth * scale); c.height = Math.round(im.naturalHeight * scale);
+    const ctx = c.getContext('2d');
+    ctx.imageSmoothingQuality = 'high';
+    ctx.drawImage(im, 0, 0, c.width, c.height);
+    const data = ctx.getImageData(0, 0, c.width, c.height);
+    recolorPixels(data, key, suitHex, trimHex, accentHex);
     ctx.putImageData(data, 0, 0);
     const url = c.toDataURL('image/png');
     recolorCache[ck] = url;
     return url;
+  }
+
+  // ---- animated rangers: a sprite sheet of the GIF's frames (SHEET.cols x SHEET.rows cells, played in order) ----
+  const SHEET = { cols: 8, rows: 5, cw: 360, ch: 540 };
+  const isSheet = (rec) => !!rec && rec.im.naturalWidth === SHEET.cols * SHEET.cw && rec.im.naturalHeight === SHEET.rows * SHEET.ch;
+  const sheetUrls = {}; // recolor key -> blob url once every frame is recolored
+  const sheetBusy = {};
+  const sheetOrder = [];
+
+  function sheetFor(key, suitHex, trimHex, accentHex) {
+    const ck = `${key}|${suitHex}|${trimHex}|${accentHex || ""}|sheet`;
+    if (sheetUrls[ck] || sheetBusy[ck]) return sheetUrls[ck] || '';
+    sheetBusy[ck] = true;
+    // recolor all the frames off the render path, then swap the animated version in
+    setTimeout(() => {
+      const rec = imgs[key];
+      if (!rec) { delete sheetBusy[ck]; return; }
+      const c = document.createElement('canvas');
+      c.width = rec.im.naturalWidth; c.height = rec.im.naturalHeight;
+      const ctx = c.getContext('2d');
+      ctx.drawImage(rec.im, 0, 0);
+      for (let r = 0; r < SHEET.rows; r++) {
+        for (let q = 0; q < SHEET.cols; q++) {
+          const cell = ctx.getImageData(q * SHEET.cw, r * SHEET.ch, SHEET.cw, SHEET.ch);
+          recolorPixels(cell, key, suitHex, trimHex, accentHex);
+          ctx.putImageData(cell, q * SHEET.cw, r * SHEET.ch);
+        }
+      }
+      c.toBlob((blob) => {
+        delete sheetBusy[ck];
+        if (!blob) return;
+        sheetUrls[ck] = URL.createObjectURL(blob);
+        sheetOrder.push(ck);
+        while (sheetOrder.length > 3) { const old = sheetOrder.shift(); URL.revokeObjectURL(sheetUrls[old]); delete sheetUrls[old]; }
+        scheduleRender();
+      }, 'image/png');
+    }, 0);
+    return '';
+  }
+
+  // The ranger picture: a plain image, or (for animated sheets) the first frame until the full animation is ready.
+  function rangerHTML(key, extraClass, suitHex, trimHex, accentHex) {
+    const rec = imgs[key];
+    if (!isSheet(rec)) return `<img class="art-ranger${extraClass}" alt="" src="${recolored(key, suitHex, trimHex, accentHex)}">`;
+    const sheet = sheetFor(key, suitHex, trimHex, accentHex);
+    const inner = sheet
+      ? `<div class="art-sheet" style="background-image:url(${sheet})"></div>`
+      : `<img class="art-still" alt="" src="${stillOfSheet(key, suitHex, trimHex, accentHex)}">`;
+    return `<div class="art-ranger${extraClass}" style="aspect-ratio:${SHEET.cw}/${SHEET.ch}">${inner}</div>`;
+  }
+
+  function stillOfSheet(key, suitHex, trimHex, accentHex) {
+    const ck = `${key}|${suitHex}|${trimHex}|${accentHex || ""}|still`;
+    if (recolorCache[ck]) return recolorCache[ck];
+    const c = document.createElement('canvas');
+    c.width = SHEET.cw; c.height = SHEET.ch;
+    const ctx = c.getContext('2d');
+    ctx.drawImage(imgs[key].im, 0, 0, SHEET.cw, SHEET.ch, 0, 0, SHEET.cw, SHEET.ch);
+    const data = ctx.getImageData(0, 0, SHEET.cw, SHEET.ch);
+    recolorPixels(data, key, suitHex, trimHex, accentHex);
+    ctx.putImageData(data, 0, 0);
+    return (recolorCache[ck] = c.toDataURL('image/png'));
   }
 
   function hslToRgb(h, s, l) {
@@ -342,11 +408,12 @@ const ArtKit = (() => {
         html += `<img class="art-superaura" alt="" src="${tinted('aura-super', auraRgb)}">`;
       }
 
-      // the ranger and what he holds move together (effects on art-figure, idle breathing on art-bob)
+      // the ranger and what he holds move together (effects on art-figure; the ranger's own idle motion is the GIF frames)
       html += '<div class="art-figure"><div class="art-bob">';
       if (main !== 'wait') {
         const isPower = main === 'legacyPower' || main.startsWith('super-');
-        html += `<img class="art-ranger${isPower ? ' art-power' : ''}" alt="" src="${recolored(main, suitHex, trimHex, accentHex)}">`;      }
+        html += rangerHTML(main, isPower ? ' art-power' : '', suitHex, trimHex, accentHex);
+      }
 
       // holstered blaster + held weapon, only when the ranger photo doesn't already include them
       if (!superOk) {

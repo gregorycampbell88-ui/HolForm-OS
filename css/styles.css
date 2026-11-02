@@ -906,10 +906,52 @@ main {
 /* ---------- motion (all from code; no extra art) ---------- */
 .art-figure, .art-bob { position: absolute; inset: 0; }
 .art-figure { transform-origin: 50% 96%; }
-.art-bob { transform-origin: 50% 96%; animation: artBreathe 4s ease-in-out infinite; will-change: transform; }
-@keyframes artBreathe {
-  0%, 100% { transform: translateY(0) scale(1) rotate(-0.45deg); }
-  50% { transform: translateY(-0.7%) scale(1.012) rotate(0.45deg); }
+.art-bob { transform-origin: 50% 96%; }
+/* the ranger's own motion: the frames of your GIF, played from a sprite sheet (8 x 5 frames, 4 second loop) */
+div.art-ranger { position: absolute; }
+.art-sheet, .art-still { position: absolute; inset: 0; width: 100%; height: 100%; }
+.art-sheet { background-size: 800% 500%; background-repeat: no-repeat; animation: sheetPlay 4s step-end infinite; }
+@keyframes sheetPlay {
+  0.00% { background-position: 0.0000% 0.0000%; }
+  2.50% { background-position: 14.2857% 0.0000%; }
+  5.00% { background-position: 28.5714% 0.0000%; }
+  7.50% { background-position: 42.8571% 0.0000%; }
+  10.00% { background-position: 57.1429% 0.0000%; }
+  12.50% { background-position: 71.4286% 0.0000%; }
+  15.00% { background-position: 85.7143% 0.0000%; }
+  17.50% { background-position: 100.0000% 0.0000%; }
+  20.00% { background-position: 0.0000% 25.0000%; }
+  22.50% { background-position: 14.2857% 25.0000%; }
+  25.00% { background-position: 28.5714% 25.0000%; }
+  27.50% { background-position: 42.8571% 25.0000%; }
+  30.00% { background-position: 57.1429% 25.0000%; }
+  32.50% { background-position: 71.4286% 25.0000%; }
+  35.00% { background-position: 85.7143% 25.0000%; }
+  37.50% { background-position: 100.0000% 25.0000%; }
+  40.00% { background-position: 0.0000% 50.0000%; }
+  42.50% { background-position: 14.2857% 50.0000%; }
+  45.00% { background-position: 28.5714% 50.0000%; }
+  47.50% { background-position: 42.8571% 50.0000%; }
+  50.00% { background-position: 57.1429% 50.0000%; }
+  52.50% { background-position: 71.4286% 50.0000%; }
+  55.00% { background-position: 85.7143% 50.0000%; }
+  57.50% { background-position: 100.0000% 50.0000%; }
+  60.00% { background-position: 0.0000% 75.0000%; }
+  62.50% { background-position: 14.2857% 75.0000%; }
+  65.00% { background-position: 28.5714% 75.0000%; }
+  67.50% { background-position: 42.8571% 75.0000%; }
+  70.00% { background-position: 57.1429% 75.0000%; }
+  72.50% { background-position: 71.4286% 75.0000%; }
+  75.00% { background-position: 85.7143% 75.0000%; }
+  77.50% { background-position: 100.0000% 75.0000%; }
+  80.00% { background-position: 0.0000% 100.0000%; }
+  82.50% { background-position: 14.2857% 100.0000%; }
+  85.00% { background-position: 28.5714% 100.0000%; }
+  87.50% { background-position: 42.8571% 100.0000%; }
+  90.00% { background-position: 57.1429% 100.0000%; }
+  92.50% { background-position: 71.4286% 100.0000%; }
+  95.00% { background-position: 85.7143% 100.0000%; }
+  97.50% { background-position: 100.0000% 100.0000%; }
 }
 .art-beast { animation: beastDrift 7s ease-in-out infinite; }
 @keyframes beastDrift {
@@ -957,9 +999,9 @@ main {
 
 /* respect the phone's reduce-motion setting, or the in-app switch */
 @media (prefers-reduced-motion: reduce) {
-  .art-bob, .art-beast, .art-bike, .art-ranger.art-power, .art-scene::after, .art-scene .art-figure { animation: none !important; }
+  .art-sheet, .art-bob, .art-beast, .art-bike, .art-ranger.art-power, .art-scene::after, .art-scene .art-figure { animation: none !important; }
 }
-.reduce-motion .art-bob, .reduce-motion .art-beast, .reduce-motion .art-bike,
+.reduce-motion .art-sheet, .reduce-motion .art-bob, .reduce-motion .art-beast, .reduce-motion .art-bike,
 .reduce-motion .art-ranger.art-power, .reduce-motion .art-scene::after,
 .reduce-motion .art-scene .art-figure, .reduce-motion .aura-pulse { animation: none !important; }
 
