@@ -34,6 +34,7 @@ const SHOP = [
   { id: 'shield', name: 'Chest Shield', desc: 'The shield. Super Modes need it.', cost: 3 },
   { id: 'blaster', name: 'Guardian Blaster', desc: 'A blaster and its holster.', cost: 2 },
   { id: 'bike', name: 'Motorcycle', desc: 'Comes with Guardian Battlizer Mode (the shield is required too).', cost: 6 },
+  { id: 'bracer', name: 'Super Battlizer Bond Bracer', desc: 'Joins Super Mode and Battlizer Mode together (needs the shield and the motorcycle).', cost: 4 },
   ...FORMS.filter((f) => f.id !== 'tiger').map((f) => ({
     id: 'emblem-' + f.id, name: `${f.name} Emblem`,
     desc: `Brings the ${WEAPON_NAMES[f.weapon]}, the ${f.name} guardian beast, and ${f.modeName}.`,
@@ -84,6 +85,7 @@ function shopCanBuy(q, id) {
   const item = SHOP.find((i) => i.id === id);
   if (!item) return { ok: false, reason: 'Unknown item' };
   if (q.owned[id]) return { ok: false, reason: 'Owned' };
+  if (id === 'bracer' && !(q.owned.shield && q.owned.bike)) return { ok: false, reason: 'Get the shield and the motorcycle first' };
   const m = /^emblem-(.+)$/.exec(id);
   if (m) {
     const idx = FORMS.findIndex((f) => f.id === m[1]);

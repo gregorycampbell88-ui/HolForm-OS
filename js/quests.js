@@ -752,7 +752,7 @@ function applyMotion() { document.documentElement.classList.toggle('reduce-motio
 const WEAPON_ICON_FALLBACK = { 'guardian-blade': 'legacySword' };
 const INV_GLYPH = {
   gun: '🔫', 'short-swords': '⚔️', 'battle-axe': '🪓', 'short-staff': '🪄', daggers: '🗡️', 'bo-staff': '🏑', 'guardian-blade': '⚔️',
-  shield: '🛡️', holster: '🔫', bike: '🏍️', beast: '🐾', megazord: '🤖', mode: '⚡', emblem: '🔰', hands: '✋',
+  shield: '🛡️', holster: '🔫', bike: '🏍️', bracer: '💚', beast: '🐾', megazord: '🤖', mode: '⚡', emblem: '🔰', hands: '✋',
 };
 
 // one tappable tile: picture (or a placeholder glyph until the art arrives), name, small caption
@@ -792,9 +792,10 @@ function renderInventory() {
 
   // gear
   const gear = [];
-  if (q.owned.shield) gear.push(invTile({ glyph: INV_GLYPH.shield, name: 'Chest Shield', sub: L.shieldOn ? 'Worn' : 'Off', on: L.shieldOn, onclick: () => setLoadout({ shieldOn: !L.shieldOn }) }));
+  if (q.owned.shield) gear.push(invTile({ keys: ['chest-shield'], glyph: INV_GLYPH.shield, name: 'Chest Shield', sub: L.shieldOn ? 'Worn' : 'Off', on: L.shieldOn, onclick: () => setLoadout({ shieldOn: !L.shieldOn }) }));
   if (q.owned.blaster) gear.push(invTile({ keys: ['holster-gun', 'weapon-gun'], glyph: INV_GLYPH.holster, name: 'Blaster holster', sub: L.holster ? 'On belt' : 'Off', on: L.holster, onclick: () => setLoadout({ holster: !L.holster }) }));
   if (q.owned.bike) gear.push(invTile({ keys: ['motorcycle'], glyph: INV_GLYPH.bike, name: 'Motorcycle', sub: 'Battlizer Mode' }));
+  if (q.owned.bracer) gear.push(invTile({ keys: ['bracer'], glyph: INV_GLYPH.bracer, name: 'Bond Bracer', sub: 'Super Battlizer' }));
   if (gear.length) group('Gear', gear);
 
   // emblems
