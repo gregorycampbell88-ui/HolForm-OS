@@ -109,7 +109,8 @@ const ArtKit = (() => {
 
   // Metallic finish (a polished-metal light ramp) for gold and silver suits and every trim except graphite and onyx, which stay matte (gunmetal is metallic).
   const METAL_SUIT = new Set(['#b9c2c8', '#cc9a1a']);
-  const METAL_TRIM = new Set(['#f2c14e', '#f4f6f7', '#cfd6dc', '#4b5864', '#111417']);
+  const METAL_TRIM = new Set(['#f2c14e', '#f4f6f7', '#cfd6dc', '#4b5864', '#111417', '#b08040', '#c8603c', '#e3ebf2']);
+  const CHROME = '#e3ebf2'; // mirror metal: deeper cool shadows, harder bands, pure white highlights
 
   // Recolors one picture's pixels in place (ImageData holding a single sprite).
   function recolorPixels(data, key, suitHex, trimHex, accentHex) {
@@ -137,6 +138,14 @@ const ArtKit = (() => {
         const shadow = base.map((v) => v * (white ? 0.6 : 0.5));
         const [gf, gt, gk] = g < 0.5 ? [shadow, base, g * 2] : [base, white ? [255, 255, 255] : [205, 212, 220], (g - 0.5) * 2];
         return gf.map((v, k) => Math.round(v + (gt[k] - v) * gk));
+      }
+      if (base[0] === 227 && base[1] === 235 && base[2] === 242) { // chrome
+        let c = clamp01(0.5 + (shade - 1) * 0.85);
+        c = c * c * (3 - 2 * c);
+        c = c * c * (3 - 2 * c);
+        c = clamp01(c + Math.sin((x + y * 0.7) / W * 30) * 0.1);
+        const [cf, ct, ck] = c < 0.5 ? [[22, 32, 46], base, c * 2] : [base, [255, 255, 255], (c - 0.5) * 2];
+        return cf.map((v, k) => Math.round(v + (ct[k] - v) * ck));
       }
       let t = clamp01(0.5 + (shade - 1) * 0.6);
       t = t * t * (3 - 2 * t);
