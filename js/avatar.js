@@ -20,6 +20,16 @@ const SUITS = [
   { id: 'gold', label: 'Gold', lv: 8, color: '#cc9a1a' },
   { id: 'onyx', label: 'Onyx', lv: 9, color: '#2b3036' },
   { id: 'emerald', label: 'Emerald', lv: 10, color: '#14a85f' },
+  // Signature suits come with an emblem (form = the emblem); achievement colors stay hidden until
+  // the title is earned (ach = title id). Both use lv 1 so they never show as a level unlock.
+  { id: 'ember', label: 'Ember', lv: 1, form: 'tiger', color: '#c8461a' },
+  { id: 'umber', label: 'Umber', lv: 1, form: 'bison', color: '#6b4a2f' },
+  { id: 'tawny', label: 'Tawny', lv: 1, form: 'lion', color: '#c0955a' },
+  { id: 'moonlit', label: 'Moonlit', lv: 1, form: 'wolf', color: '#5d7fa3' },
+  { id: 'wyrm', label: 'Wyrm', lv: 1, form: 'dragon', color: '#0f6e78' },
+  { id: 'ashfall', label: 'Ashfall', lv: 1, form: 'phoenix', color: '#6d1b3d' },
+  { id: 'midnight', label: 'Midnight', lv: 1, ach: 'iron-routine', color: '#1a1446' },
+  { id: 'dawn', label: 'Dawn', lv: 1, ach: 'dawn-patrol', color: '#f4a384' },
 ];
 // Trim: gold to start; white, silver, graphite, onyx, gunmetal, black, then bronze, copper and chrome unlock.
 const TRIMS = [
@@ -33,6 +43,15 @@ const TRIMS = [
   { id: 'bronze', label: 'Bronze', lv: 11, color: '#b08040' },
   { id: 'copper', label: 'Copper', lv: 13, color: '#c8603c' },
   { id: 'chrome', label: 'Chrome', lv: 16, color: '#e3ebf2' },
+  { id: 'amber', label: 'Amber', lv: 1, form: 'tiger', color: '#e0902a' },
+  { id: 'turquoise', label: 'Turquoise', lv: 1, form: 'bison', color: '#2fb5a8' },
+  { id: 'sunburst', label: 'Sunburst', lv: 1, form: 'lion', color: '#ffd84a' },
+  { id: 'frost', label: 'Frost', lv: 1, form: 'wolf', color: '#8fd8f0' },
+  { id: 'jade', label: 'Jade', lv: 1, form: 'dragon', color: '#3fd08a' },
+  { id: 'flame', label: 'Flame', lv: 1, form: 'phoenix', color: '#ff7a1a' },
+  { id: 'rosegold', label: 'Rose Gold', lv: 1, ach: 'seven-strong', color: '#e0a48a' },
+  { id: 'electric', label: 'Electric', lv: 1, ach: 'thunder', color: '#2e8bff' },
+  { id: 'ruby', label: 'Ruby', lv: 1, ach: 'centurion', color: '#b3122a' },
 ];
 // Trim 2 recolors the white parts (boots, gloves, suit accents). Same colors as trim 1;
 // white is the art as drawn, so it is free from the start.
@@ -47,6 +66,15 @@ const TRIMS2 = [
   { id: 'bronze', label: 'Bronze', lv: 11, color: '#b08040' },
   { id: 'copper', label: 'Copper', lv: 13, color: '#c8603c' },
   { id: 'chrome', label: 'Chrome', lv: 16, color: '#e3ebf2' },
+  { id: 'amber', label: 'Amber', lv: 1, form: 'tiger', color: '#e0902a' },
+  { id: 'turquoise', label: 'Turquoise', lv: 1, form: 'bison', color: '#2fb5a8' },
+  { id: 'sunburst', label: 'Sunburst', lv: 1, form: 'lion', color: '#ffd84a' },
+  { id: 'frost', label: 'Frost', lv: 1, form: 'wolf', color: '#8fd8f0' },
+  { id: 'jade', label: 'Jade', lv: 1, form: 'dragon', color: '#3fd08a' },
+  { id: 'flame', label: 'Flame', lv: 1, form: 'phoenix', color: '#ff7a1a' },
+  { id: 'rosegold', label: 'Rose Gold', lv: 1, ach: 'seven-strong', color: '#e0a48a' },
+  { id: 'electric', label: 'Electric', lv: 1, ach: 'thunder', color: '#2e8bff' },
+  { id: 'ruby', label: 'Ruby', lv: 1, ach: 'centurion', color: '#b3122a' },
 ];
 const HELMETS = [
   { id: 'sentinel', label: 'Sentinel', lv: 1 },
@@ -148,6 +176,19 @@ const HAIR_COLORS = [
   { id: 'green', label: 'Green', lv: 3, color: '#16a268' },
   { id: 'white', label: 'White', lv: 6, color: '#e8ecef' },
 ];
+
+// An item opens by level (lv), by owning an emblem's pack (form), or by earning a title (ach).
+function itemOpen(item, q, level) {
+  if (item.ach) return !!q.titles.unlocked[item.ach];
+  if (item.form) return formOwned(q, item.form);
+  return item.lv <= level;
+}
+// What a locked chip says; achievement colors return null and stay hidden until earned.
+function itemLockNote(item) {
+  if (item.ach) return null;
+  if (item.form) return `${FORMS.find((f) => f.id === item.form).name} emblem`;
+  return `Lv ${item.lv}`;
+}
 
 const CATALOG_SECTIONS = [
   { key: 'suit', label: 'Suit color', items: SUITS, onboarding: true },

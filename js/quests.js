@@ -209,9 +209,9 @@ function qSanitizeAvatar() {
   if (a.background === 'sanctum') a.background = 'city-inside';
   CATALOG_SECTIONS.forEach((s) => {
     const cur = s.items.find((i) => i.id === a[s.key]);
-    if (cur && cur.lv <= level) return;
-    const fallback = s.items.find((i) => i.id === def[s.key] && i.lv <= level)
-      || s.items.find((i) => i.lv <= level) || s.items[0];
+    if (cur && itemOpen(cur, state.quest, level)) return;
+    const fallback = s.items.find((i) => i.id === def[s.key] && itemOpen(i, state.quest, level))
+      || s.items.find((i) => itemOpen(i, state.quest, level)) || s.items[0];
     a[s.key] = fallback.id;
   });
 }
@@ -577,10 +577,13 @@ function renderNewTitle() {
   const t = titleById(q.newTitles[0]);
   if (!t) { q.newTitles.shift(); return el('div', {}); }
   const more = q.newTitles.length - 1;
+  const colors = [];
+  CATALOG_SECTIONS.forEach((s) => s.items.forEach((i) => { if (i.ach === t.id && !colors.includes(i.label)) colors.push(i.label); }));
   return el('div', { class: 'q-card q-levelup q-newtitle' }, [
     el('div', { class: 'q-kicker' }, 'NEW TITLE'),
     el('div', { class: 'q-big' }, t.name),
     el('div', { class: 'q-sub' }, t.desc),
+    colors.length ? el('div', { class: 'q-sub' }, `New color: ${colors.join(', ')}`) : null,
     more > 0 ? el('div', { class: 'q-sub q-dim' }, `+${more} more waiting`) : null,
     el('div', { class: 'q-row q-row-tight' }, [
       el('button', { class: 'q-btn', onclick: () => { q.titles.equipped = t.id; q.newTitles.shift(); saveState(); render(); } }, 'Equip it'),
@@ -1277,8 +1280,8 @@ function renderCustomizer(onboarding) {
 
   customizerSections(onboarding).forEach((sec) => {
     wrap.appendChild(el('div', { class: 'q-custom-label' }, sec.label));
-    wrap.appendChild(el('div', { class: 'chip-row' }, sec.items.map((item) => {
-      const locked = item.lv > level;
+    wrap.appendChild(el('div', { class: 'chip-row' }, sec.items.filter((item) => itemOpen(item, q, level) || itemLockNote(item)).map((item) => {
+      const locked = !itemOpen(item, q, level);
       const on = q.avatar[sec.key] === item.id;
       return el('button', {
         class: 'chip' + (on ? ' chip-on' : '') + (locked ? ' chip-locked' : ''),
@@ -1292,7 +1295,7 @@ function renderCustomizer(onboarding) {
             ? `background:linear-gradient(135deg,rgba(255,255,255,0.85),${item.color} 40%,${item.color} 60%,rgba(0,0,0,0.3))`
             : `background:${item.color}`,
         }) : null,
-        item.label + (item.blurb ? ` · ${item.blurb}` : '') + (locked ? ` 🔒 Lv ${item.lv}` : ''),
+        item.label + (item.blurb ? ` · ${item.blurb}` : '') + (locked ? ` 🔒 ${itemLockNote(item)}` : ''),
       ]);
     })));
   });

@@ -109,7 +109,8 @@ const ArtKit = (() => {
 
   // Metallic finish (a polished-metal light ramp) for gold and silver suits and every trim except graphite and onyx, which stay matte (gunmetal is metallic).
   const METAL_SUIT = new Set(['#b9c2c8', '#cc9a1a']);
-  const METAL_TRIM = new Set(['#f2c14e', '#f4f6f7', '#cfd6dc', '#4b5864', '#111417', '#b08040', '#c8603c', '#e3ebf2']);
+  const METAL_TRIM = new Set(['#f2c14e', '#f4f6f7', '#cfd6dc', '#4b5864', '#111417', '#b08040', '#c8603c', '#e3ebf2',
+    '#e0902a', '#2fb5a8', '#ffd84a', '#8fd8f0', '#3fd08a', '#ff7a1a', '#e0a48a', '#2e8bff', '#b3122a']);
   const CHROME = '#e3ebf2'; // mirror metal: deeper cool shadows, harder bands, pure white highlights
 
   // Recolors one picture's pixels in place (ImageData holding a single sprite).
