@@ -632,7 +632,7 @@ function scheduleClearFx() {
   clearTimeout(fxTimer);
   fxTimer = setTimeout(() => {
     document.querySelectorAll('.art-scene').forEach((s) => {
-      s.classList.remove('fx-morph', 'fx-powerup', 'fx-superup', 'fx-battlizerup', 'fx-power', 'fx-pop');
+      s.classList.remove('fx-morph', 'fx-powerup', 'fx-superup', 'fx-battlizerup', 'fx-superbattlizerup', 'fx-power', 'fx-pop');
       s.querySelectorAll('.art-powerup, .art-superaura').forEach((n) => n.remove());
     });
   }, 1000);
@@ -698,7 +698,10 @@ function setLoadout(change) {
   const batWas = wasSuper && wasMode === 'battlizer';
   const comboWas = wasSuper && !isEmblemMode(wasMode);
   // Battlizer on: its own aura burst (like Back to Action). Battlizer or Super Battlizer off: the Power Down flash.
+  const sbNow = isSuper && q.loadout.superMode === 'superbattlizer';
+  const sbWas = wasSuper && wasMode === 'superbattlizer';
   if (batNow && !batWas) questUI.fx = 'battlizerup';
+  else if (sbNow && !sbWas) questUI.fx = 'superbattlizerup';
   else if (comboWas && !isSuper) questUI.fx = 'morph';
   // super mode switching on (or to another mode) gets the big aura burst; switching off keeps the old flash
   else if (isSuper && (!wasSuper || q.loadout.superMode !== wasMode)) questUI.fx = 'superup';
@@ -779,7 +782,7 @@ function renderActionsCard() {
 
 // ---- motion preference (this device only; follows the phone's "reduce motion" setting by default) ----
 // bump together with CACHE in sw.js on every deploy
-const APP_BUILD = 65;
+const APP_BUILD = 67;
 const MOTION_KEY = 'holform-motion';
 function motionOff() {
   try {

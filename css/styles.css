@@ -1060,7 +1060,7 @@ div.art-ranger { position: absolute; }
 
 /* Super Mode: wider aura art, sized to the frame, same quick burst */
 .art-superaura { position: absolute; left: 50%; bottom: -1%; width: 106%; height: auto; transform: translateX(-50%); transform-origin: 50% 100%; pointer-events: none; opacity: 0; }
-.fx-superup .art-superaura, .fx-battlizerup .art-superaura { animation: auraBurst 0.85s ease-out both; }
+.fx-superup .art-superaura, .fx-battlizerup .art-superaura, .fx-superbattlizerup .art-superaura { animation: auraBurst 0.85s ease-out both; }
 @media (prefers-reduced-motion: reduce) { .art-superaura { animation: none !important; } }
 .reduce-motion .art-superaura { animation: none !important; }
 

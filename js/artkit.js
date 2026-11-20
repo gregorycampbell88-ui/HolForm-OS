@@ -370,6 +370,7 @@ const ArtKit = (() => {
       request('aura-powerup'); // warm up the aura bursts so they're ready on first use
       request('aura-super');
       request('aura-battlizer');
+      request('aura-superbattlizer');
       return PRIMARY.some((k) => !!imgs[k]);
     },
     // true once we know whether the primary ranger images exist (loaded or confirmed missing)
@@ -393,6 +394,9 @@ const ArtKit = (() => {
       const helmet = a.morphed !== false ? 'on' : 'off';
       const weapon = L.weaponHeld && L.weapon ? L.weapon : null;
       // warm up this emblem's Battlizer so switching it on isn't interrupted by the picture arriving mid-flash
+      if (modesAvailable(q).length && L.superMode) { // same for the chosen super mode and its stand-in picture
+        request(`super-${L.superMode}-${weapon || 'unarmed'}`); request(`super-${L.superMode}-unarmed`); request('legacyPower');
+      }
       if (modesAvailable(q).includes('battlizer')) request(`battlizer-${L.emblem}`);
       if (modesAvailable(q).includes('superbattlizer')) request(`superbattlizer-${L.emblem}`);
 
@@ -439,7 +443,7 @@ const ArtKit = (() => {
       const coreRgb = mix(auraRgb, [255, 255, 255], 0.65);
       const auraVars = `--aura:rgb(${auraRgb});--aura-core:rgb(${coreRgb})`;
       // super mode reuses the power-up flash + charge, with its own wider aura art
-      const fxClass = fx ? ' fx-' + fx + (fx === 'superup' || fx === 'battlizerup' ? ' fx-powerup' : '') : '';
+      const fxClass = fx ? ' fx-' + fx + (fx === 'superup' || fx === 'battlizerup' || fx === 'superbattlizerup' ? ' fx-powerup' : '') : '';
       let html = `<div class="art-scene${fxClass}" style="${auraVars}" role="img" aria-label="Your ranger">`;
       const bgKey = BG_ART[a.background];
       if (bgKey) request(bgKey);
@@ -476,9 +480,13 @@ const ArtKit = (() => {
       if (fx === 'battlizerup' && imgs['aura-battlizer']) {
         html += `<img class="art-superaura" alt="" src="${greenTinted('aura-battlizer', auraRgb)}">`;
       }
-      // Super Mode: the wider aura that fits the frame
+      // Super Mode: a ring of green flame (the greens follow the suit color, the gold stays)
       if (fx === 'superup' && imgs['aura-super']) {
-        html += `<img class="art-superaura" alt="" src="${tinted('aura-super', auraRgb)}">`;
+        html += `<img class="art-superaura" alt="" src="${greenTinted('aura-super', auraRgb)}">`;
+      }
+      // Super Battlizer on: flame and lightning around an emerald
+      if (fx === 'superbattlizerup' && imgs['aura-superbattlizer']) {
+        html += `<img class="art-superaura" alt="" src="${greenTinted('aura-superbattlizer', auraRgb)}">`;
       }
 
       // the ranger and what he holds move together (effects on art-figure; the ranger's own idle motion is the GIF frames)
