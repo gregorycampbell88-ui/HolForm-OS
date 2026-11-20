@@ -755,7 +755,9 @@ function applyMotion() { document.documentElement.classList.toggle('reduce-motio
 const WEAPON_ICON_FALLBACK = { 'guardian-blade': 'legacySword' };
 const INV_GLYPH = {
   gun: '🔫', 'short-swords': '⚔️', 'battle-axe': '🪓', 'short-staff': '🪄', daggers: '🗡️', 'bo-staff': '🏑', 'guardian-blade': '⚔️',
-  shield: '🛡️', holster: '🔫', bike: '🏍️', bracer: '💚', beast: '🐾', megazord: '🤖', mode: '⚡', emblem: '🔰', hands: '✋',
+  shield: '🛡️', holster: '🔫', bike: '🏍️', bracer: '💚', beast: '🐾', megazord: '🤖', mode: '⚡', emblem: '🔰',
+  // "nothing selected": a green diamond outlined in gold
+  hands: '<svg viewBox="0 0 100 100" width="44" height="44" aria-hidden="true"><polygon points="50,6 94,50 50,94 6,50" fill="#14a85f" stroke="#f2c14e" stroke-width="7" stroke-linejoin="round"/><polygon points="50,24 76,50 50,76 24,50" fill="#3fd08a" opacity="0.55"/></svg>',
 };
 
 // one tappable tile: picture (or a placeholder glyph until the art arrives), name, small caption
@@ -763,7 +765,7 @@ function invTile({ keys = [], glyph = '', name, sub = '', on = false, onclick = 
   let src = '';
   for (const k of keys) { src = ArtKit.url(k); if (src) break; }
   return el('button', { class: 'inv-tile' + (on ? ' inv-on' : ''), ...(onclick ? { onclick } : {}) }, [
-    el('div', { class: 'inv-pic' }, src ? el('img', { src, alt: '' }) : el('span', { class: 'inv-glyph' }, glyph)),
+    el('div', { class: 'inv-pic' }, src ? el('img', { src, alt: '' }) : glyph.startsWith('<svg') ? el('span', { class: 'inv-glyph', html: glyph }) : el('span', { class: 'inv-glyph' }, glyph)),
     el('div', { class: 'inv-name' }, name),
     sub ? el('div', { class: 'inv-sub' }, sub) : null,
   ]);

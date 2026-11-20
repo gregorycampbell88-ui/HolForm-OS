@@ -123,8 +123,13 @@ const ArtKit = (() => {
     const W = data.width;
     // trim 2 leaves some white alone: with the helmet off the face area (skin, eyes, teeth),
     // with the helmet on the white mouthpiece
-    const faceRows = /helmet-off$|^legacyRangerOff$/.test(key) ? Math.round(data.height * 0.21) : 0;
-    const mouth = /helmet-on$|^legacyRanger$/.test(key)
+    // Poses holding a weapon (and the Battlizers) carry their own head position in SHEET_GEO (fractions of the cell).
+    const geo = typeof SHEET_GEO !== 'undefined' ? SHEET_GEO[key] : null;
+    const box = (f) => f ? { x0: f[0] * W, y0: f[1] * data.height, x1: f[2] * W, y1: f[3] * data.height } : null;
+    const faceBox = geo ? box(geo.face) : null;
+    const faceRows = !geo && /helmet-off$|^legacyRangerOff$/.test(key) ? Math.round(data.height * 0.21) : 0;
+    const inFace = (x, y) => faceBox ? x >= faceBox.x0 && x <= faceBox.x1 && y >= faceBox.y0 && y <= faceBox.y1 : y < faceRows;
+    const mouth = geo ? box(geo.mouth) : /helmet-on$|^legacyRanger$/.test(key)
       ? { x0: W * 0.44, x1: W * 0.58, y0: data.height * 0.125, y1: data.height * 0.17 } : null;
     const clamp01 = (v) => Math.max(0, Math.min(1, v));
     // Metal finish: the art's own light and shade is pushed through a steep dark -> color -> bright ramp
@@ -171,9 +176,10 @@ const ArtKit = (() => {
         const chroma = Math.max(r, g, b) - Math.min(r, g, b);
         const px = i / 4, y = Math.floor(px / W), x = px % W;
         // hue 26+ catches the dark orange-ish shading of the gold; skin-orange hues (below 36) are skipped in the face area
-        const wGold = h >= 26 && h <= 58 && l > 0.2 && (h >= 36 || y >= faceRows) ? clamp01((chroma - 30) / 40) : 0;
+        const face = inFace(x, y);
+        const wGold = h >= 26 && h <= 58 && l > 0.2 && (h >= 36 || !face) ? clamp01((chroma - 30) / 40) : 0;
         const inMouth = mouth && x >= mouth.x0 && x <= mouth.x1 && y >= mouth.y0 && y <= mouth.y1;
-        const canAccent = accent && l > 0.58 && chroma < 70 && y >= faceRows && !inMouth;
+        const canAccent = accent && l > 0.58 && chroma < 70 && !face && !inMouth;
         let tOut = wGold > 0 ? (keepTrim ? [r, g, b] : tint(trim, l, 0.5)) : null;
         let aOut = canAccent ? tint(accent, l, 0.92) : [r, g, b];
         if (tOut && metalTrim) tOut = metalize(trim, l / 0.5, x, y);
@@ -208,8 +214,21 @@ const ArtKit = (() => {
   }
 
   // ---- animated rangers: a sprite sheet of the GIF's frames (SHEET.cols x SHEET.rows cells, played in order) ----
+  // The standing rangers are 360x540 cells; weapon poses and Battlizers have their own cell size and window (see js/sheetgeo.js).
   const SHEET = { cols: 8, rows: 5, cw: 360, ch: 540 };
-  const isSheet = (rec) => !!rec && rec.im.naturalWidth === SHEET.cols * SHEET.cw && rec.im.naturalHeight === SHEET.rows * SHEET.ch;
+  const sheetGeo = (key) => (typeof SHEET_GEO !== 'undefined' ? SHEET_GEO[key] : null) || null;
+  const isSheet = (rec, key) => !!rec && (sheetGeo(key)
+    ? rec.im.naturalWidth % SHEET.cols === 0 && rec.im.naturalHeight % SHEET.rows === 0
+    : rec.im.naturalWidth === SHEET.cols * SHEET.cw && rec.im.naturalHeight === SHEET.rows * SHEET.ch);
+  const cellOf = (rec) => ({ cw: rec.im.naturalWidth / SHEET.cols, ch: rec.im.naturalHeight / SHEET.rows });
+  // Where a pose's window sits inside the standing ranger's box (640x960 world, feet midpoint at 324,950),
+  // shrunk about the feet if it would not fit the scene (wide lances, wings, tall swords).
+  function sheetBox(geo) {
+    const w = geo.win, AX = 324, FY = 950;
+    const f = Math.min(1, (1.12 * 444) / Math.max(AX - w[0], w[0] + w[2] - AX, 1), 1035 / Math.max(FY - w[1], 1));
+    const p = (v) => `${(v * 100).toFixed(3)}%`;
+    return `inset:auto;left:${p((AX + (w[0] - AX) * f) / 640)};top:${p((FY + (w[1] - FY) * f) / 960)};width:${p(w[2] * f / 640)};height:${p(w[3] * f / 960)};`;
+  }
   const sheetUrls = {}; // recolor key -> blob url once every frame is recolored
   const sheetBusy = {};
   const sheetOrder = [];
@@ -226,11 +245,12 @@ const ArtKit = (() => {
       c.width = rec.im.naturalWidth; c.height = rec.im.naturalHeight;
       const ctx = c.getContext('2d');
       ctx.drawImage(rec.im, 0, 0);
+      const { cw, ch } = cellOf(rec);
       for (let r = 0; r < SHEET.rows; r++) {
         for (let q = 0; q < SHEET.cols; q++) {
-          const cell = ctx.getImageData(q * SHEET.cw, r * SHEET.ch, SHEET.cw, SHEET.ch);
+          const cell = ctx.getImageData(q * cw, r * ch, cw, ch);
           recolorPixels(cell, key, suitHex, trimHex, accentHex);
-          ctx.putImageData(cell, q * SHEET.cw, r * SHEET.ch);
+          ctx.putImageData(cell, q * cw, r * ch);
         }
       }
       c.toBlob((blob) => {
@@ -248,22 +268,25 @@ const ArtKit = (() => {
   // The ranger picture: a plain image, or (for animated sheets) the first frame until the full animation is ready.
   function rangerHTML(key, extraClass, suitHex, trimHex, accentHex) {
     const rec = imgs[key];
-    if (!isSheet(rec)) return `<img class="art-ranger${extraClass}" alt="" src="${recolored(key, suitHex, trimHex, accentHex)}">`;
+    if (!isSheet(rec, key)) return `<img class="art-ranger${extraClass}" alt="" src="${recolored(key, suitHex, trimHex, accentHex)}">`;
+    const geo = sheetGeo(key);
+    const box = geo ? sheetBox(geo) : '';
     const sheet = sheetFor(key, suitHex, trimHex, accentHex);
     const inner = sheet
-      ? `<div class="art-sheet" style="background-image:url(${sheet})"></div>`
-      : `<img class="art-still" alt="" src="${stillOfSheet(key, suitHex, trimHex, accentHex)}">`;
+      ? `<div class="art-sheet" style="${box}${geo ? `animation-duration:${geo.dur}s;` : ''}background-image:url(${sheet})"></div>`
+      : `<img class="art-still" alt="" style="${box}" src="${stillOfSheet(key, suitHex, trimHex, accentHex)}">`;
     return `<div class="art-ranger${extraClass}" style="aspect-ratio:${SHEET.cw}/${SHEET.ch}">${inner}</div>`;
   }
 
   function stillOfSheet(key, suitHex, trimHex, accentHex) {
     const ck = `${key}|${suitHex}|${trimHex}|${accentHex || ""}|still`;
     if (recolorCache[ck]) return recolorCache[ck];
+    const { cw, ch } = cellOf(imgs[key]);
     const c = document.createElement('canvas');
-    c.width = SHEET.cw; c.height = SHEET.ch;
+    c.width = cw; c.height = ch;
     const ctx = c.getContext('2d');
-    ctx.drawImage(imgs[key].im, 0, 0, SHEET.cw, SHEET.ch, 0, 0, SHEET.cw, SHEET.ch);
-    const data = ctx.getImageData(0, 0, SHEET.cw, SHEET.ch);
+    ctx.drawImage(imgs[key].im, 0, 0, cw, ch, 0, 0, cw, ch);
+    const data = ctx.getImageData(0, 0, cw, ch);
     recolorPixels(data, key, suitHex, trimHex, accentHex);
     ctx.putImageData(data, 0, 0);
     return (recolorCache[ck] = c.toDataURL('image/png'));
@@ -350,7 +373,9 @@ const ArtKit = (() => {
       const baked = {}; // key -> what that image already includes
       let mainKeys;
       if (superOk) {
-        mainKeys = [`super-${L.superMode}-${weapon || 'unarmed'}`, `super-${L.superMode}-unarmed`, 'legacyPower'];
+        // Battlizer: one armored pose per emblem (it carries that emblem's own weapon)
+        mainKeys = [L.superMode === 'battlizer' ? `battlizer-${L.emblem}` : null,
+          `super-${L.superMode}-${weapon || 'unarmed'}`, `super-${L.superMode}-unarmed`, 'legacyPower'].filter(Boolean);
       } else {
         mainKeys = [];
         const add = (b, w, h) => {
@@ -403,8 +428,8 @@ const ArtKit = (() => {
         // beasts and zords wear your suit + trim colors too
         if (bp && bp !== 'wait') html += `<img class="art-beast${L.beast === 'megazord' || L.beast === 'ultra' ? ' art-mega' : ''}" alt="" src="${recolored(bp, suitHex, trimHex)}">`;
       }
-      // motorcycle with Battlizer
-      if (superOk && L.superMode === 'battlizer') {
+      // motorcycle with Battlizer (the emblem's own Battlizer pose stands on its own)
+      if (superOk && L.superMode === 'battlizer' && !(imgs[`battlizer-${L.emblem}`] && main === `battlizer-${L.emblem}`)) {
         const bike = pick(['motorcycle']);
         if (bike && bike !== 'wait') html += `<img class="art-bike" alt="" src="${imgs.motorcycle.url}">`;
       }
@@ -421,7 +446,7 @@ const ArtKit = (() => {
       // the ranger and what he holds move together (effects on art-figure; the ranger's own idle motion is the GIF frames)
       html += '<div class="art-figure"><div class="art-bob">';
       if (main !== 'wait') {
-        const isPower = main === 'legacyPower' || main.startsWith('super-');
+        const isPower = main === 'legacyPower' || main.startsWith('super-') || main.startsWith('battlizer-');
         html += rangerHTML(main, isPower ? ' art-power' : '', suitHex, trimHex, accentHex);
       }
 

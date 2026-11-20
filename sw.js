@@ -1,4 +1,4 @@
-const CACHE = 'holform-os-v55';
+const CACHE = 'holform-os-v56';
 const ASSETS = [
   './',
   './index.html',
@@ -7,6 +7,7 @@ const ASSETS = [
   './js/app.js',
   './js/face.js',
   './js/avatar.js',
+  './js/sheetgeo.js',
   './js/artkit.js',
   './js/titles.js',
   './js/shop.js',
