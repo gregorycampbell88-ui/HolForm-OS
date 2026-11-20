@@ -225,7 +225,7 @@ const ArtKit = (() => {
   // shrunk about the feet if it would not fit the scene (wide lances, wings, tall swords).
   function sheetBox(geo) {
     const w = geo.win, AX = 324, FY = 950;
-    const f = Math.min(1, (1.12 * 444) / Math.max(AX - w[0], w[0] + w[2] - AX, 1), 1035 / Math.max(FY - w[1], 1));
+    const f = Math.min(1, (0.97 * 444) / Math.max(AX - w[0], w[0] + w[2] - AX, 1), 1035 / Math.max(FY - w[1], 1));
     const p = (v) => `${(v * 100).toFixed(3)}%`;
     return `inset:auto;left:${p((AX + (w[0] - AX) * f) / 640)};top:${p((FY + (w[1] - FY) * f) / 960)};width:${p(w[2] * f / 640)};height:${p(w[3] * f / 960)};`;
   }

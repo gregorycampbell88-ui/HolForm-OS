@@ -664,7 +664,7 @@ function renderCharacterCard() {
     }, questUI.inventory ? 'Close inventory' : 'Inventory'));
   }
   const pp = ppBalance(q);
-  return el('div', { class: 'q-card q-character' }, [
+  return el('div', { class: 'q-card q-character' + (art ? ' art-stack' : '') }, [
     el('div', { class: 'avatar-wrap' + (art ? ' art-wrap' : ''), html: avatarHTML(q.avatar, fx) }),
     el('div', { class: 'q-char-info' }, [
       el('div', { class: 'q-level' }, `Level ${info.level}`),

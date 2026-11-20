@@ -870,6 +870,11 @@ main {
 .art-ranger.art-power { height: 96%; bottom: 2%; }
 .art-sword { width: 34%; left: 61%; bottom: 29%; transform-origin: 30% 68%; transform: rotate(-34deg); }
 .avatar-preview.art-wrap { max-width: 260px; flex: none; }
+/* with your art the frame gets the whole width (wide poses, wings and tall swords need the room); level and buttons sit under it */
+.q-character.art-stack { flex-direction: column; align-items: stretch; }
+.q-character.art-stack .art-wrap { flex: none; width: 100%; max-width: 360px; margin: 0 auto; }
+.q-character.art-stack .q-char-info { width: 100%; }
+.q-character.art-stack .q-row { flex-wrap: wrap; }
 
 .morpher-btn { display: inline-flex; align-items: center; gap: 6px; background: var(--charcoal-2); border: 1px solid var(--green); color: var(--green); border-radius: 999px; padding: 4px 12px 4px 4px; font-size: 0.8rem; font-weight: 700; cursor: pointer; }
 .morpher-btn img { width: 40px; height: 30px; object-fit: contain; }
