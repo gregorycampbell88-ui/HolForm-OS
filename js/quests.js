@@ -655,12 +655,26 @@ function renderCharacterCard() {
   if (art) {
     // the morpher shown is the one for the emblem you have equipped (the old single morpher until its art arrives)
     const morpherKey = ArtKit.url('morpher-' + q.loadout.emblem) ? 'morpher-' + q.loadout.emblem : 'morpher';
+    // in a super mode (Super Mode, Battlizer or Super Battlizer) Power Down drops back to the regular ranger, helmet off, same gear
+    const inSuper = q.loadout.superOn && modesAvailable(q).includes(q.loadout.superMode);
     buttons.push(el('button', {
       class: 'morpher-btn',
-      onclick: () => { q.avatar.morphed = q.avatar.morphed === false; q.stats.morphs += 1; questUI.fx = q.avatar.morphed ? 'powerup' : 'morph'; qCheckTitles(); saveState(); render(); },
+      onclick: () => {
+        q.stats.morphs += 1;
+        if (inSuper) {
+          clearTimeout(sbPoseTimer); questUI.sbPoseUntil = 0; // a Super Battlizer pose that is still showing ends too
+          q.loadout.superOn = false;
+          q.avatar.morphed = false;
+          questUI.fx = 'morph';
+        } else {
+          q.avatar.morphed = q.avatar.morphed === false;
+          questUI.fx = q.avatar.morphed ? 'powerup' : 'morph';
+        }
+        qCheckTitles(); saveState(); render();
+      },
     }, [
       ArtKit.url(morpherKey) ? el('img', { src: ArtKit.url(morpherKey), alt: '' }) : null,
-      el('span', {}, q.avatar.morphed === false ? 'Back to Action' : 'Power Down'),
+      el('span', {}, q.avatar.morphed === false && !inSuper ? 'Back to Action' : 'Power Down'),
     ]));
     buttons.push(...formToggleChips());
   }
@@ -742,7 +756,7 @@ function formToggleChips() {
     ? chipBtn('Shield', { on: L.shieldOn, locked: superOn, onclick: () => setLoadout({ shieldOn: !L.shieldOn }) })
     : chipBtn('Shield 🔒', { locked: true, title: 'Buy it in the shop' }));
   add(q.owned.blaster
-    ? chipBtn('Holstered blaster', { on: L.holster, locked: superOn, onclick: () => setLoadout({ holster: !L.holster }) })
+    ? chipBtn('Blaster', { on: L.holster, locked: superOn, onclick: () => setLoadout({ holster: !L.holster }) })
     : chipBtn('Blaster 🔒', { locked: true, title: 'Buy it in the shop' }));
   add(wname
     ? chipBtn(`Weapon: ${wname}`, { on: L.weaponHeld, onclick: () => setLoadout({ weaponHeld: !L.weaponHeld }) })
@@ -799,7 +813,7 @@ function renderActionsCard() {
 
 // ---- motion preference (this device only; follows the phone's "reduce motion" setting by default) ----
 // bump together with CACHE in sw.js on every deploy
-const APP_BUILD = 70;
+const APP_BUILD = 71;
 const MOTION_KEY = 'holform-motion';
 function motionOff() {
   try {
