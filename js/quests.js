@@ -555,12 +555,12 @@ function renderQuest() {
   if (q.newTitles.length) c.appendChild(renderNewTitle());
   if (questUI.result) c.appendChild(renderResult());
   if (questUI.nextAnchor) c.appendChild(renderNextAnchor());
+  if (artActive()) c.appendChild(renderActionsCard());
   if (artActive() && questUI.inventory) {
     // inventory view: keep the ranger on screen so each pick shows right away
     c.appendChild(renderInventory());
     return;
   }
-  if (artActive()) c.appendChild(renderFormToggles());
   c.appendChild(renderSessionPanel());
   c.appendChild(renderMissionPanel());
   const extras = renderSavedAndConvos();
@@ -642,7 +642,8 @@ function renderCharacterCard() {
   const q = state.quest;
   const info = levelInfo(q.xp);
   const art = artActive();
-  const buttons = [
+  // with your art: Power Down / Back to Action plus the gear toggles sit under the ranger (Customize and Inventory are in the card below)
+  const buttons = art ? [] : [
     el('button', { class: 'q-btn q-btn-ghost', onclick: () => { questUI.customizing = true; render(); } }, 'Customize'),
   ];
   // one-shot effect for whatever the player just toggled (consumed so it plays once)
@@ -659,9 +660,7 @@ function renderCharacterCard() {
       ArtKit.url(morpherKey) ? el('img', { src: ArtKit.url(morpherKey), alt: '' }) : null,
       el('span', {}, q.avatar.morphed === false ? 'Back to Action' : 'Power Down'),
     ]));
-    buttons.push(el('button', {
-      class: 'q-btn q-btn-ghost', onclick: () => { questUI.inventory = !questUI.inventory; render(); },
-    }, questUI.inventory ? 'Close inventory' : 'Inventory'));
+    buttons.push(...formToggleChips());
   }
   const pp = ppBalance(q);
   return el('div', { class: 'q-card q-character' + (art ? ' art-stack' : '') }, [
@@ -708,26 +707,24 @@ function setLoadout(change) {
   render();
 }
 
-// The toggles under the character: helmet, shield, holstered blaster, weapon in hand, super mode.
-function renderFormToggles() {
+// The gear toggles that sit next to Power Down / Back to Action: shield, holstered blaster, weapon in hand,
+// super mode, Battlizer and Super Battlizer. (The helmet is the Power Down button itself.)
+function formToggleChips() {
   const q = state.quest;
   const L = q.loadout;
   const superOn = L.superOn && modesAvailable(q).includes(L.superMode);
   const modes = modesAvailable(q);
   const wname = L.weapon ? WEAPON_NAMES[L.weapon] : null;
-  const row = el('div', { class: 'chip-row chip-row-center form-toggles' });
+  const row = [];
+  const add = (c) => row.push(c);
 
-  row.appendChild(chipBtn(q.avatar.morphed === false ? 'Helmet off' : 'Helmet on', {
-    on: q.avatar.morphed !== false, locked: superOn,
-    onclick: () => { q.avatar.morphed = q.avatar.morphed === false; questUI.fx = q.avatar.morphed ? 'powerup' : 'morph'; saveState(); render(); },
-  }));
-  row.appendChild(q.owned.shield
+  add(q.owned.shield
     ? chipBtn('Shield', { on: L.shieldOn, locked: superOn, onclick: () => setLoadout({ shieldOn: !L.shieldOn }) })
     : chipBtn('Shield 🔒', { locked: true, title: 'Buy it in the shop' }));
-  row.appendChild(q.owned.blaster
+  add(q.owned.blaster
     ? chipBtn('Holstered blaster', { on: L.holster, locked: superOn, onclick: () => setLoadout({ holster: !L.holster }) })
     : chipBtn('Blaster 🔒', { locked: true, title: 'Buy it in the shop' }));
-  row.appendChild(wname
+  add(wname
     ? chipBtn(`Weapon: ${wname}`, { on: L.weaponHeld, onclick: () => setLoadout({ weaponHeld: !L.weaponHeld }) })
     : chipBtn('Weapon 🔒', { locked: true, title: 'Unlock a weapon first' }));
   // Battlizer is its own on/off button; the Super Mode chip is for the emblem's mode
@@ -735,25 +732,36 @@ function renderFormToggles() {
   const superBattlizerOn = superOn && L.superMode === 'superbattlizer';
   const emblemSuperOn = superOn && isEmblemMode(L.superMode);
   const emblemMode = modes.includes(L.superMode) && isEmblemMode(L.superMode) ? L.superMode : (modes.includes(L.emblem) ? L.emblem : modes.find(isEmblemMode));
-  row.appendChild(modes.length
+  add(modes.length
     ? chipBtn(emblemSuperOn ? `Super: ${modeName(L.superMode)}` : 'Super Mode', {
       on: emblemSuperOn,
       onclick: () => setLoadout(emblemSuperOn ? { superOn: false } : { superMode: emblemMode, superOn: true }),
     })
     : chipBtn('Super Mode 🔒', { locked: true, title: 'Buy the Chest Shield first' }));
   if (modes.includes('battlizer')) {
-    row.appendChild(chipBtn(battlizerOn ? 'Battlizer on' : 'Battlizer off', {
+    add(chipBtn(battlizerOn ? 'Battlizer on' : 'Battlizer off', {
       on: battlizerOn,
       onclick: () => setLoadout(battlizerOn ? { superOn: false } : { superMode: 'battlizer', superOn: true }),
     }));
   }
   // the Bond Bracer unlocks this one
   if (modes.includes('superbattlizer')) {
-    row.appendChild(chipBtn(superBattlizerOn ? 'Super Battlizer on' : 'Super Battlizer off', {
+    add(chipBtn(superBattlizerOn ? 'Super Battlizer on' : 'Super Battlizer off', {
       on: superBattlizerOn,
       onclick: () => setLoadout(superBattlizerOn ? { superOn: false } : { superMode: 'superbattlizer', superOn: true }),
     }));
   }
+  return row;
+}
+
+// The card where the toggles used to be: Customize, Inventory, and the motion + version notes.
+function renderActionsCard() {
+  const row = el('div', { class: 'chip-row chip-row-center form-toggles' }, [
+    el('button', { class: 'q-btn q-btn-ghost', onclick: () => { questUI.customizing = true; render(); } }, 'Customize'),
+    el('button', {
+      class: 'q-btn q-btn-ghost', onclick: () => { questUI.inventory = !questUI.inventory; render(); },
+    }, questUI.inventory ? 'Close inventory' : 'Inventory'),
+  ]);
   const motion = el('button', {
     class: 'motion-toggle',
     onclick: () => { setMotionOff(!motionOff()); render(); },
@@ -771,7 +779,7 @@ function renderFormToggles() {
 
 // ---- motion preference (this device only; follows the phone's "reduce motion" setting by default) ----
 // bump together with CACHE in sw.js on every deploy
-const APP_BUILD = 63;
+const APP_BUILD = 65;
 const MOTION_KEY = 'holform-motion';
 function motionOff() {
   try {
