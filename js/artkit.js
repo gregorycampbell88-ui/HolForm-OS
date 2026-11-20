@@ -328,6 +328,32 @@ const ArtKit = (() => {
     return url;
   }
 
+  // Battlizer aura: only its greens take the suit color; the gold and white stay as drawn.
+  function greenTinted(key, rgb) {
+    const rec = imgs[key];
+    if (!rec) return '';
+    const ck = `${key}|green|${rgb.join(',')}`;
+    if (recolorCache[ck]) return recolorCache[ck];
+    const im = rec.im;
+    const c = document.createElement('canvas');
+    c.width = im.naturalWidth; c.height = im.naturalHeight;
+    const ctx = c.getContext('2d');
+    ctx.drawImage(im, 0, 0);
+    const data = ctx.getImageData(0, 0, c.width, c.height);
+    const d = data.data;
+    const [th, ts] = rgbToHsl(rgb[0], rgb[1], rgb[2]);
+    const satScale = Math.min(1, ts / 0.7);
+    for (let i = 0; i < d.length; i += 4) {
+      if (d[i + 3] < 4) continue;
+      const [h, s, l] = rgbToHsl(d[i], d[i + 1], d[i + 2]);
+      if (h < 75 || h > 175 || s < 0.2) continue;
+      const out = hslToRgb(th, Math.min(1, s * satScale), l);
+      d[i] = out[0]; d[i + 1] = out[1]; d[i + 2] = out[2];
+    }
+    ctx.putImageData(data, 0, 0);
+    return (recolorCache[ck] = c.toDataURL('image/png'));
+  }
+
   const place = (p) => `left:${p.left}%;bottom:${p.bottom}%;width:${p.width}%`
     + (p.rot ? `;transform:rotate(${p.rot}deg);transform-origin:${p.origin}` : '');
 
@@ -343,6 +369,7 @@ const ArtKit = (() => {
       PRIMARY.forEach(request);
       request('aura-powerup'); // warm up the aura bursts so they're ready on first use
       request('aura-super');
+      request('aura-battlizer');
       return PRIMARY.some((k) => !!imgs[k]);
     },
     // true once we know whether the primary ranger images exist (loaded or confirmed missing)
@@ -365,6 +392,8 @@ const ArtKit = (() => {
       const superOk = L.superOn && modesAvailable(q).includes(L.superMode);
       const helmet = a.morphed !== false ? 'on' : 'off';
       const weapon = L.weaponHeld && L.weapon ? L.weapon : null;
+      // warm up this emblem's Battlizer so switching it on isn't interrupted by the picture arriving mid-flash
+      if (modesAvailable(q).includes('battlizer')) request(`battlizer-${L.emblem}`);
 
       const holsterWanted = !superOk && !!(L.holster && q.owned.blaster);
       // Regular form: a ready-made photo that already holds the weapon / holster is best
@@ -405,7 +434,7 @@ const ArtKit = (() => {
       const coreRgb = mix(auraRgb, [255, 255, 255], 0.65);
       const auraVars = `--aura:rgb(${auraRgb});--aura-core:rgb(${coreRgb})`;
       // super mode reuses the power-up flash + charge, with its own wider aura art
-      const fxClass = fx ? ' fx-' + fx + (fx === 'superup' ? ' fx-powerup' : '') : '';
+      const fxClass = fx ? ' fx-' + fx + (fx === 'superup' || fx === 'battlizerup' ? ' fx-powerup' : '') : '';
       let html = `<div class="art-scene${fxClass}" style="${auraVars}" role="img" aria-label="Your ranger">`;
       const bgKey = BG_ART[a.background];
       if (bgKey) request(bgKey);
@@ -437,6 +466,10 @@ const ArtKit = (() => {
       // Back to Action: your aura art bursts up behind the ranger (only rendered for that one-shot effect)
       if (fx === 'powerup' && imgs['aura-powerup']) {
         html += `<img class="art-powerup" alt="" src="${tinted('aura-powerup', auraRgb)}">`;
+      }
+      // Battlizer on: its own ring of green and gold
+      if (fx === 'battlizerup' && imgs['aura-battlizer']) {
+        html += `<img class="art-superaura" alt="" src="${greenTinted('aura-battlizer', auraRgb)}">`;
       }
       // Super Mode: the wider aura that fits the frame
       if (fx === 'superup' && imgs['aura-super']) {

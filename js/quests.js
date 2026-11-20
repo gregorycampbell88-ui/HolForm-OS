@@ -632,7 +632,7 @@ function scheduleClearFx() {
   clearTimeout(fxTimer);
   fxTimer = setTimeout(() => {
     document.querySelectorAll('.art-scene').forEach((s) => {
-      s.classList.remove('fx-morph', 'fx-powerup', 'fx-superup', 'fx-power', 'fx-pop');
+      s.classList.remove('fx-morph', 'fx-powerup', 'fx-superup', 'fx-battlizerup', 'fx-power', 'fx-pop');
       s.querySelectorAll('.art-powerup, .art-superaura').forEach((n) => n.remove());
     });
   }, 1000);
@@ -695,8 +695,13 @@ function setLoadout(change) {
   Object.assign(q.loadout, change);
   shopSanitize(q);
   const isSuper = q.loadout.superOn && modesAvailable(q).includes(q.loadout.superMode);
+  const batNow = isSuper && q.loadout.superMode === 'battlizer';
+  const batWas = wasSuper && wasMode === 'battlizer';
+  // Battlizer on: its own aura burst (like Back to Action). Battlizer off: the Power Down flash.
+  if (batNow && !batWas) questUI.fx = 'battlizerup';
+  else if (batWas && !batNow) questUI.fx = 'morph';
   // super mode switching on (or to another mode) gets the big aura burst; switching off keeps the old flash
-  if (isSuper && (!wasSuper || q.loadout.superMode !== wasMode)) questUI.fx = 'superup';
+  else if (isSuper && (!wasSuper || q.loadout.superMode !== wasMode)) questUI.fx = 'superup';
   else questUI.fx = ('superOn' in change || 'superMode' in change) ? 'power' : 'pop';
   saveState();
   render();
@@ -724,9 +729,22 @@ function renderFormToggles() {
   row.appendChild(wname
     ? chipBtn(`Weapon: ${wname}`, { on: L.weaponHeld, onclick: () => setLoadout({ weaponHeld: !L.weaponHeld }) })
     : chipBtn('Weapon 🔒', { locked: true, title: 'Unlock a weapon first' }));
+  // Battlizer is its own on/off button; the Super Mode chip is for the emblem's mode
+  const battlizerOn = superOn && L.superMode === 'battlizer';
+  const emblemSuperOn = superOn && !battlizerOn;
+  const emblemMode = modes.includes(L.superMode) && L.superMode !== 'battlizer' ? L.superMode : (modes.includes(L.emblem) ? L.emblem : modes.find((m) => m !== 'battlizer'));
   row.appendChild(modes.length
-    ? chipBtn(superOn ? `Super: ${modeName(L.superMode)}` : 'Super Mode', { on: superOn, onclick: () => setLoadout({ superOn: !L.superOn }) })
+    ? chipBtn(emblemSuperOn ? `Super: ${modeName(L.superMode)}` : 'Super Mode', {
+      on: emblemSuperOn,
+      onclick: () => setLoadout(emblemSuperOn ? { superOn: false } : { superMode: emblemMode, superOn: true }),
+    })
     : chipBtn('Super Mode 🔒', { locked: true, title: 'Buy the Chest Shield first' }));
+  if (modes.includes('battlizer')) {
+    row.appendChild(chipBtn(battlizerOn ? 'Battlizer on' : 'Battlizer off', {
+      on: battlizerOn,
+      onclick: () => setLoadout(battlizerOn ? { superOn: false } : { superMode: 'battlizer', superOn: true }),
+    }));
+  }
   const motion = el('button', {
     class: 'motion-toggle',
     onclick: () => { setMotionOff(!motionOff()); render(); },
