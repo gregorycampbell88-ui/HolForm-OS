@@ -1,4 +1,4 @@
-const CACHE = 'holform-os-v62';
+const CACHE = 'holform-os-v63';
 const ASSETS = [
   './',
   './index.html',
@@ -34,10 +34,13 @@ self.addEventListener('activate', (e) => {
 });
 
 // Network-first: always try for fresh content, fall back to cache when offline.
+// Our own files are revalidated every time (cache: 'no-cache'): GitHub Pages lets browsers reuse them for 10 minutes,
+// which would otherwise keep a new version off the phone for a while after an update.
 self.addEventListener('fetch', (e) => {
   if (e.request.method !== 'GET') return;
+  const ours = new URL(e.request.url).origin === self.location.origin;
   e.respondWith(
-    fetch(e.request).then((res) => {
+    fetch(e.request, ours ? { cache: 'no-cache' } : undefined).then((res) => {
       if (res && res.status === 200) {
         const copy = res.clone();
         caches.open(CACHE).then((c) => c.put(e.request, copy));

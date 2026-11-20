@@ -758,10 +758,20 @@ function renderFormToggles() {
     class: 'motion-toggle',
     onclick: () => { setMotionOff(!motionOff()); render(); },
   }, motionOff() ? 'Motion: off' : 'Motion: on');
-  return el('div', { class: 'q-card' }, [row, el('div', { class: 'motion-row' }, [motion])]);
+  // which version this phone is running (the page's own build, plus the offline cache's if that differs)
+  const ver = el('span', { class: 'app-version' }, `Version ${APP_BUILD}`);
+  if (window.caches) {
+    caches.keys().then((keys) => {
+      const k = keys.map((x) => /v(\d+)$/.exec(x)).filter(Boolean).map((m) => +m[1]).sort((a, b) => b - a)[0];
+      if (k && k !== APP_BUILD) ver.textContent = `Version ${APP_BUILD} (cache ${k})`;
+    }).catch(() => {});
+  }
+  return el('div', { class: 'q-card' }, [row, el('div', { class: 'motion-row' }, [motion, el('div', {}, [ver])])]);
 }
 
 // ---- motion preference (this device only; follows the phone's "reduce motion" setting by default) ----
+// bump together with CACHE in sw.js on every deploy
+const APP_BUILD = 63;
 const MOTION_KEY = 'holform-motion';
 function motionOff() {
   try {
