@@ -1081,3 +1081,10 @@ div.art-ranger { position: absolute; }
 /* super-mode paintings (flames included): fitted to the width of the frame, no extra glow on top */
 img.art-ranger.art-power.art-superstill { height: auto; width: 100%; bottom: 4%; animation: none; }
 div.art-ranger.art-power.art-superstill { animation: none; }
+/* Super Battlizer pose: its aura rises quickly and stays until the Super Battlizer takes over */
+.fx-sbpose .art-sbposeaura { animation: sbPoseAura 1.4s ease-out both; }
+@keyframes sbPoseAura {
+  0% { opacity: 0; transform: translateX(-50%) scale(0.8, 0.55); }
+  22% { opacity: 1; transform: translateX(-50%) scale(1.02, 1.05); }
+  100% { opacity: 0.9; transform: translateX(-50%) scale(1.05, 1.12); }
+}

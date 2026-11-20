@@ -647,9 +647,11 @@ function renderCharacterCard() {
     el('button', { class: 'q-btn q-btn-ghost', onclick: () => { questUI.customizing = true; render(); } }, 'Customize'),
   ];
   // one-shot effect for whatever the player just toggled (consumed so it plays once)
-  const fx = questUI.fx;
+  let fx = questUI.fx;
   questUI.fx = null;
-  if (fx) scheduleClearFx();
+  // the Super Battlizer pose keeps showing through any re-render until its time is up
+  if (!fx && questUI.sbPoseUntil > Date.now()) fx = 'sbpose';
+  if (fx && fx !== 'sbpose') scheduleClearFx();
   if (art) {
     // the morpher shown is the one for the emblem you have equipped (the old single morpher until its art arrives)
     const morpherKey = ArtKit.url('morpher-' + q.loadout.emblem) ? 'morpher-' + q.loadout.emblem : 'morpher';
@@ -687,6 +689,8 @@ function chipBtn(label, { on = false, locked = false, onclick = null, title = ''
   }, label);
 }
 
+const SB_POSE_MS = 1400; // how long the Super Battlizer pose shows before it flashes into the Super Battlizer
+let sbPoseTimer = null;
 function setLoadout(change) {
   const q = state.quest;
   const wasSuper = q.loadout.superOn && modesAvailable(q).includes(q.loadout.superMode);
@@ -700,8 +704,21 @@ function setLoadout(change) {
   // Battlizer on: its own aura burst (like Back to Action). Battlizer or Super Battlizer off: the Power Down flash.
   const sbNow = isSuper && q.loadout.superMode === 'superbattlizer';
   const sbWas = wasSuper && wasMode === 'superbattlizer';
+  clearTimeout(sbPoseTimer); questUI.sbPoseUntil = 0; // any change cancels a pose that is still showing
   if (batNow && !batWas) questUI.fx = 'battlizerup';
-  else if (sbNow && !sbWas) questUI.fx = 'superbattlizerup';
+  else if (sbNow && !sbWas) {
+    // Super Battlizer: the pose with its aura first, then the Super Battlizer with its own aura
+    if (ArtKit.url('sbpose-' + q.loadout.emblem) && ArtKit.url('aura-sbpose')) {
+      questUI.fx = 'sbpose';
+      questUI.sbPoseUntil = Date.now() + SB_POSE_MS;
+      sbPoseTimer = setTimeout(() => {
+        const L = state.quest.loadout;
+        questUI.sbPoseUntil = 0;
+        if (L.superOn && L.superMode === 'superbattlizer') questUI.fx = 'superbattlizerup';
+        render();
+      }, SB_POSE_MS);
+    } else questUI.fx = 'superbattlizerup';
+  }
   else if (comboWas && !isSuper) questUI.fx = 'morph';
   // super mode switching on (or to another mode) gets the big aura burst; switching off keeps the old flash
   else if (isSuper && (!wasSuper || q.loadout.superMode !== wasMode)) questUI.fx = 'superup';
@@ -782,7 +799,7 @@ function renderActionsCard() {
 
 // ---- motion preference (this device only; follows the phone's "reduce motion" setting by default) ----
 // bump together with CACHE in sw.js on every deploy
-const APP_BUILD = 69;
+const APP_BUILD = 70;
 const MOTION_KEY = 'holform-motion';
 function motionOff() {
   try {

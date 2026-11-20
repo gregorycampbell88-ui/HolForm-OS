@@ -400,7 +400,9 @@ const ArtKit = (() => {
         if (own) request(`super-${L.superMode}-${own}`);
       }
       if (modesAvailable(q).includes('battlizer')) request(`battlizer-${L.emblem}`);
-      if (modesAvailable(q).includes('superbattlizer')) request(`superbattlizer-${L.emblem}`);
+      if (modesAvailable(q).includes('superbattlizer')) {
+        request(`superbattlizer-${L.emblem}`); request(`sbpose-${L.emblem}`); request('aura-sbpose');
+      }
 
       const holsterWanted = !superOk && !!(L.holster && q.owned.blaster);
       // Regular form: a ready-made photo that already holds the weapon / holster is best
@@ -409,7 +411,12 @@ const ArtKit = (() => {
       const baked = {}; // key -> what that image already includes
       let mainKeys;
       const ownWeapon = (typeof FORMS !== 'undefined' && (FORMS.find((f) => f.mode === L.superMode) || {}).weapon) || null;
-      if (superOk) {
+      // Super Battlizer on: first the pose (hand out, bracer on) with its own aura, then it flashes into the Super Battlizer
+      const poseKey = `sbpose-${L.emblem}`;
+      const poseOn = fx === 'sbpose' && superOk && L.superMode === 'superbattlizer' && !!imgs[poseKey];
+      if (poseOn) {
+        mainKeys = [poseKey];
+      } else if (superOk) {
         // Battlizer: one armored pose per emblem (it carries that emblem's own weapon)
         // Super Battlizer: superbattlizer-<emblem> (its own pose) until that art exists, the Battlizer pose stands in
         mainKeys = [L.superMode === 'superbattlizer' ? `superbattlizer-${L.emblem}` : null,
@@ -448,7 +455,7 @@ const ArtKit = (() => {
       const coreRgb = mix(auraRgb, [255, 255, 255], 0.65);
       const auraVars = `--aura:rgb(${auraRgb});--aura-core:rgb(${coreRgb})`;
       // super mode reuses the power-up flash + charge, with its own wider aura art
-      const fxClass = fx ? ' fx-' + fx + (fx === 'superup' || fx === 'battlizerup' || fx === 'superbattlizerup' ? ' fx-powerup' : '') : '';
+      const fxClass = fx ? ' fx-' + fx + (fx === 'superup' || fx === 'battlizerup' || fx === 'superbattlizerup' || fx === 'sbpose' ? ' fx-powerup' : '') : '';
       let html = `<div class="art-scene${fxClass}" style="${auraVars}" role="img" aria-label="Your ranger">`;
       const bgKey = BG_ART[a.background];
       if (bgKey) request(bgKey);
@@ -488,6 +495,10 @@ const ArtKit = (() => {
       // Super Mode: a ring of green flame (the greens follow the suit color, the gold stays)
       if (fx === 'superup' && imgs['aura-super']) {
         html += `<img class="art-superaura" alt="" src="${greenTinted('aura-super', auraRgb)}">`;
+      }
+      // the pose's own aura (green flame and lightning), held until the Super Battlizer takes over
+      if (poseOn && imgs['aura-sbpose']) {
+        html += `<img class="art-superaura art-sbposeaura" alt="" src="${greenTinted('aura-sbpose', auraRgb)}">`;
       }
       // Super Battlizer on: flame and lightning around an emerald
       if (fx === 'superbattlizerup' && imgs['aura-superbattlizer']) {
