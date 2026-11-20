@@ -394,6 +394,7 @@ const ArtKit = (() => {
       const weapon = L.weaponHeld && L.weapon ? L.weapon : null;
       // warm up this emblem's Battlizer so switching it on isn't interrupted by the picture arriving mid-flash
       if (modesAvailable(q).includes('battlizer')) request(`battlizer-${L.emblem}`);
+      if (modesAvailable(q).includes('superbattlizer')) request(`superbattlizer-${L.emblem}`);
 
       const holsterWanted = !superOk && !!(L.holster && q.owned.blaster);
       // Regular form: a ready-made photo that already holds the weapon / holster is best
@@ -403,7 +404,9 @@ const ArtKit = (() => {
       let mainKeys;
       if (superOk) {
         // Battlizer: one armored pose per emblem (it carries that emblem's own weapon)
-        mainKeys = [L.superMode === 'battlizer' ? `battlizer-${L.emblem}` : null,
+        // Super Battlizer: superbattlizer-<emblem> (its own pose) until that art exists, the Battlizer pose stands in
+        mainKeys = [L.superMode === 'superbattlizer' ? `superbattlizer-${L.emblem}` : null,
+          L.superMode === 'battlizer' || L.superMode === 'superbattlizer' ? `battlizer-${L.emblem}` : null,
           `super-${L.superMode}-${weapon || 'unarmed'}`, `super-${L.superMode}-unarmed`, 'legacyPower'].filter(Boolean);
       } else {
         mainKeys = [];
@@ -420,7 +423,9 @@ const ArtKit = (() => {
         });
         mainKeys.push(helmet === 'on' ? 'legacyRanger' : 'legacyRangerOff', 'legacyRanger');
       }
-      mainKeys.forEach(request); // ask for every candidate at once instead of one after another
+      // ask for the candidates at once instead of one after another, but stop at the first one already loaded
+      // (asking for pictures that don't exist yet would re-render the scene and cut a one-shot effect short)
+      for (const k of mainKeys) { request(k); if (imgs[k]) break; }
       const main = pick(mainKeys);
       if (main === null) return null;
       const has = (main && baked[main]) || { weapon: false, holster: false };
@@ -479,7 +484,7 @@ const ArtKit = (() => {
       // the ranger and what he holds move together (effects on art-figure; the ranger's own idle motion is the GIF frames)
       html += '<div class="art-figure"><div class="art-bob">';
       if (main !== 'wait') {
-        const isPower = main === 'legacyPower' || main.startsWith('super-') || main.startsWith('battlizer-');
+        const isPower = main === 'legacyPower' || main.startsWith('super-') || main.startsWith('battlizer-') || main.startsWith('superbattlizer-');
         html += rangerHTML(main, isPower ? ' art-power' : '', suitHex, trimHex, accentHex);
       }
 

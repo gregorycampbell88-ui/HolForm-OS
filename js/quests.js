@@ -697,9 +697,10 @@ function setLoadout(change) {
   const isSuper = q.loadout.superOn && modesAvailable(q).includes(q.loadout.superMode);
   const batNow = isSuper && q.loadout.superMode === 'battlizer';
   const batWas = wasSuper && wasMode === 'battlizer';
-  // Battlizer on: its own aura burst (like Back to Action). Battlizer off: the Power Down flash.
+  const comboWas = wasSuper && !isEmblemMode(wasMode);
+  // Battlizer on: its own aura burst (like Back to Action). Battlizer or Super Battlizer off: the Power Down flash.
   if (batNow && !batWas) questUI.fx = 'battlizerup';
-  else if (batWas && !batNow) questUI.fx = 'morph';
+  else if (comboWas && !isSuper) questUI.fx = 'morph';
   // super mode switching on (or to another mode) gets the big aura burst; switching off keeps the old flash
   else if (isSuper && (!wasSuper || q.loadout.superMode !== wasMode)) questUI.fx = 'superup';
   else questUI.fx = ('superOn' in change || 'superMode' in change) ? 'power' : 'pop';
@@ -731,8 +732,9 @@ function renderFormToggles() {
     : chipBtn('Weapon 🔒', { locked: true, title: 'Unlock a weapon first' }));
   // Battlizer is its own on/off button; the Super Mode chip is for the emblem's mode
   const battlizerOn = superOn && L.superMode === 'battlizer';
-  const emblemSuperOn = superOn && !battlizerOn;
-  const emblemMode = modes.includes(L.superMode) && L.superMode !== 'battlizer' ? L.superMode : (modes.includes(L.emblem) ? L.emblem : modes.find((m) => m !== 'battlizer'));
+  const superBattlizerOn = superOn && L.superMode === 'superbattlizer';
+  const emblemSuperOn = superOn && isEmblemMode(L.superMode);
+  const emblemMode = modes.includes(L.superMode) && isEmblemMode(L.superMode) ? L.superMode : (modes.includes(L.emblem) ? L.emblem : modes.find(isEmblemMode));
   row.appendChild(modes.length
     ? chipBtn(emblemSuperOn ? `Super: ${modeName(L.superMode)}` : 'Super Mode', {
       on: emblemSuperOn,
@@ -743,6 +745,13 @@ function renderFormToggles() {
     row.appendChild(chipBtn(battlizerOn ? 'Battlizer on' : 'Battlizer off', {
       on: battlizerOn,
       onclick: () => setLoadout(battlizerOn ? { superOn: false } : { superMode: 'battlizer', superOn: true }),
+    }));
+  }
+  // the Bond Bracer unlocks this one
+  if (modes.includes('superbattlizer')) {
+    row.appendChild(chipBtn(superBattlizerOn ? 'Super Battlizer on' : 'Super Battlizer off', {
+      on: superBattlizerOn,
+      onclick: () => setLoadout(superBattlizerOn ? { superOn: false } : { superMode: 'superbattlizer', superOn: true }),
     }));
   }
   const motion = el('button', {
@@ -843,7 +852,11 @@ function renderInventory() {
   if (modes.length) {
     group('Super mode', [
       invTile({ glyph: INV_GLYPH.hands, name: 'Regular form', on: !superOn, onclick: () => setLoadout({ superOn: false }) }),
-      ...modes.map((m) => invTile({ glyph: INV_GLYPH.mode, name: modeName(m), on: superOn && L.superMode === m, onclick: () => setLoadout({ superMode: m, superOn: true }) })),
+      // each emblem's flaming super emblem; Battlizer shows the motorcycle and Super Battlizer the Bond Bracer
+      ...modes.map((m) => invTile({
+        keys: [m === 'battlizer' ? 'motorcycle' : m === 'superbattlizer' ? 'bracer' : `mode-${m}`], glyph: INV_GLYPH.mode,
+        name: modeName(m), on: superOn && L.superMode === m, onclick: () => setLoadout({ superMode: m, superOn: true }),
+      })),
     ]);
   }
 

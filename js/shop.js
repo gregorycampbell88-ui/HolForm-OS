@@ -34,7 +34,7 @@ const SHOP = [
   { id: 'shield', name: 'Chest Shield', desc: 'The shield. Super Modes need it.', cost: 3 },
   { id: 'blaster', name: 'Guardian Blaster', desc: 'A blaster and its holster.', cost: 2 },
   { id: 'bike', name: 'Motorcycle', desc: 'Comes with Guardian Battlizer Mode (the shield is required too).', cost: 6 },
-  { id: 'bracer', name: 'Super Battlizer Bond Bracer', desc: 'Joins Super Mode and Battlizer Mode together (needs the shield and the motorcycle).', cost: 4 },
+  { id: 'bracer', name: 'Super Battlizer Bond Bracer', desc: 'Unlocks Super Battlizer Mode, Super Mode and Battlizer Mode joined (needs the shield and the motorcycle).', cost: 4 },
   ...FORMS.filter((f) => f.id !== 'tiger').map((f) => ({
     id: 'emblem-' + f.id, name: `${f.name} Emblem`,
     desc: `Brings the ${WEAPON_NAMES[f.weapon]}, the ${f.name} guardian beast, and ${f.modeName}.`,
@@ -72,11 +72,14 @@ function modesAvailable(q) {
   if (!q.owned.shield) return [];
   const out = [];
   if (q.owned.bike) out.push('battlizer');
+  if (q.owned.bike && q.owned.bracer) out.push('superbattlizer'); // the Bond Bracer unlocks it
   FORMS.forEach((f) => { if (emblemOwned(q, f.id)) out.push(f.mode); });
   return out;
 }
+const isEmblemMode = (m) => m !== 'battlizer' && m !== 'superbattlizer';
 function modeName(id) {
   if (id === 'battlizer') return BATTLIZER_NAME;
+  if (id === 'superbattlizer') return 'Super Battlizer Mode';
   const f = FORMS.find((x) => x.id === id);
   return f ? f.modeName : id;
 }
