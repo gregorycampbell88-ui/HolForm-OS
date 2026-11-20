@@ -396,6 +396,8 @@ const ArtKit = (() => {
       // warm up this emblem's Battlizer so switching it on isn't interrupted by the picture arriving mid-flash
       if (modesAvailable(q).length && L.superMode) { // same for the chosen super mode and its stand-in picture
         request(`super-${L.superMode}-${weapon || 'unarmed'}`); request(`super-${L.superMode}-unarmed`); request('legacyPower');
+        const own = (FORMS.find((f) => f.mode === L.superMode) || {}).weapon;
+        if (own) request(`super-${L.superMode}-${own}`);
       }
       if (modesAvailable(q).includes('battlizer')) request(`battlizer-${L.emblem}`);
       if (modesAvailable(q).includes('superbattlizer')) request(`superbattlizer-${L.emblem}`);
@@ -406,12 +408,15 @@ const ArtKit = (() => {
       // name = ranger-<emblem>[-noshield][-<weapon>][-holster]-helmet-<on|off>   (no shield: the chest roundel still shows the emblem)
       const baked = {}; // key -> what that image already includes
       let mainKeys;
+      const ownWeapon = (typeof FORMS !== 'undefined' && (FORMS.find((f) => f.mode === L.superMode) || {}).weapon) || null;
       if (superOk) {
         // Battlizer: one armored pose per emblem (it carries that emblem's own weapon)
         // Super Battlizer: superbattlizer-<emblem> (its own pose) until that art exists, the Battlizer pose stands in
         mainKeys = [L.superMode === 'superbattlizer' ? `superbattlizer-${L.emblem}` : null,
           L.superMode === 'battlizer' || L.superMode === 'superbattlizer' ? `battlizer-${L.emblem}` : null,
-          `super-${L.superMode}-${weapon || 'unarmed'}`, `super-${L.superMode}-unarmed`, 'legacyPower'].filter(Boolean);
+          `super-${L.superMode}-${weapon || 'unarmed'}`, `super-${L.superMode}-unarmed`,
+          // no weapon in hand: the pose with the emblem's own weapon beats the old stand-in
+          ownWeapon ? `super-${L.superMode}-${ownWeapon}` : null, 'legacyPower'].filter(Boolean);
       } else {
         mainKeys = [];
         const add = (b, w, h) => {
@@ -493,7 +498,8 @@ const ArtKit = (() => {
       html += '<div class="art-figure"><div class="art-bob">';
       if (main !== 'wait') {
         const isPower = main === 'legacyPower' || main.startsWith('super-') || main.startsWith('battlizer-') || main.startsWith('superbattlizer-');
-        html += rangerHTML(main, isPower ? ' art-power' : '', suitHex, trimHex, accentHex);
+        // the super-mode paintings carry their own flames, so they are fitted to the frame's width
+        html += rangerHTML(main, (isPower ? ' art-power' : '') + (/^(super-|superbattlizer-)/.test(main) ? ' art-superstill' : ''), suitHex, trimHex, accentHex);
       }
 
       // holstered blaster + held weapon, only when the ranger photo doesn't already include them

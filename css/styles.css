@@ -1078,3 +1078,5 @@ div.art-ranger { position: absolute; }
 /* picture backgrounds (Command Center outside / inside) */
 .art-bgimg { inset: 0; width: 100%; height: 100%; object-fit: cover; }
 .app-version { display: inline-block; margin-top: 2px; color: var(--mid-gray); font-size: 0.68rem; opacity: 0.8; }
+/* super-mode paintings (flames included): fitted to the width of the frame, no extra glow on top */
+.art-ranger.art-power.art-superstill { height: auto; width: 100%; bottom: 4%; animation: none; }
