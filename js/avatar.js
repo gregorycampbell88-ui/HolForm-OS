@@ -126,9 +126,11 @@ const BACKGROUNDS = [
   { id: 'plain', label: 'Plain', lv: 1 },
   { id: 'city', label: 'Command Center (Outside)', lv: 4 },
   { id: 'city-inside', label: 'Command Center (Inside)', lv: 6 },
-  { id: 'stars', label: 'Stars', lv: 6 },
-  { id: 'forest', label: 'Forest', lv: 8 },
-  { id: 'arena', label: 'Arena', lv: 10 },
+  { id: 'stars', label: 'Starry Skies', lv: 6 },
+  { id: 'forest', label: 'Forest', lv: 8 }, // drawn only (no painting): hidden when you use your art
+  { id: 'metro', label: 'City', lv: 8 },
+  { id: 'arena', label: 'Training Arena', lv: 10 },
+  { id: 'villain', label: 'Villain Base', lv: 12 },
 ];
 // Unmasked look (shown when the helmet is off)
 const CHARS = [

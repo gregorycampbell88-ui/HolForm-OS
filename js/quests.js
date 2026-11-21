@@ -813,7 +813,7 @@ function renderActionsCard() {
 
 // ---- motion preference (this device only; follows the phone's "reduce motion" setting by default) ----
 // bump together with CACHE in sw.js on every deploy
-const APP_BUILD = 71;
+const APP_BUILD = 72;
 const MOTION_KEY = 'holform-motion';
 function motionOff() {
   try {
@@ -1329,7 +1329,9 @@ function renderFaceControls(preview) {
 
 // With your art, gear comes from the shop/loadout. The customizer keeps the
 // color and look options that still apply: suit, trim, background, and glow effects.
-const ART_ALLOWED = { suit: null, trim: null, trim2: null, aura: ['none', 'glow', 'bolt', 'legend', 'legend2'], background: null };
+const ART_ALLOWED = { suit: null, trim: null, trim2: null, aura: ['none', 'glow', 'bolt', 'legend', 'legend2'],
+  // the backgrounds you painted (the drawn Forest has no painting)
+  background: ['plain', 'city', 'city-inside', 'stars', 'metro', 'arena', 'villain'] };
 
 function customizerSections(onboarding) {
   const art = artActive();
