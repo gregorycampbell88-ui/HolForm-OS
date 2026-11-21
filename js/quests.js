@@ -813,7 +813,7 @@ function renderActionsCard() {
 
 // ---- motion preference (this device only; follows the phone's "reduce motion" setting by default) ----
 // bump together with CACHE in sw.js on every deploy
-const APP_BUILD = 72;
+const APP_BUILD = 73;
 const MOTION_KEY = 'holform-motion';
 function motionOff() {
   try {
