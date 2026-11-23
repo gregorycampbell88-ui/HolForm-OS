@@ -20,6 +20,7 @@ const DEFAULT_STATE = {
   scheduleOverrides: {}, // { [groupKey]: {anchorMinutes, items:[{id,label,category,accent,durationMin}]} }
   quest: {},             // character, XP, missions, gaming sessions — shape lives in js/quests.js
   weeklyAdjustments: {}, // { [weekKey]: string } — the one adjustment chosen at the Sunday review
+  toolLinks: {},         // { leads, posts } — the claude.ai links to the Lead Tracker and Post Log (saved with your data, never in the repo)
 };
 
 let state = loadState();
@@ -259,6 +260,8 @@ function renderToday() {
     }, isMinimum ? '✓ Minimum-Viable Day' : 'Shrink to Minimum-Viable Day'),
     el('button', { class: 'edit-schedule-btn', onclick: () => startEditingSchedule(groupKey) }, '✎ Edit Schedule'),
   ]));
+
+  if (isToday && typeof renderToolsCard === 'function') container.appendChild(renderToolsCard());
 
   if (isMinimum) {
     container.appendChild(renderMinimumList(checksForDay));

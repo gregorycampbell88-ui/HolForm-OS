@@ -75,6 +75,7 @@ function qStatsDefault() {
     missions: 0, convos: 0, edits: 0, cleanEdits: 0, editsExtended: 0, saves: 0, resumes: 0,
     sessions: 0, tasksDone: 0, blocks: 0, minChecks: 0, parked: 0, morning: 0,
     revenueFirst: 0, morphs: 0, comebacks: 0, days: [],
+    leadDays: 0, postLogs: 0, tenX: 0,
   };
 }
 
@@ -100,6 +101,7 @@ function qDefaults() {
     levelUp: null,
     pickedAvailable: 20,
     calTimes: { business: '09:30', end: '12:00', sunday: '08:30' },
+    toolLast: { leads: null, posts: null },   // last day each business tool was updated
   };
 }
 
@@ -117,10 +119,12 @@ function qEnsure() {
   // the old cartoon-avatar format (v1) is reset; the ranger format (v2) is topped up
   if (!q.avatar || typeof q.avatar !== 'object' || q.avatar.v !== 2) q.avatar = qDefaultAvatar();
   else qFill(q.avatar, qDefaultAvatar());
-  ['calTimes', 'stats', 'titles', 'loadout', 'owned'].forEach((k) => {
+  ['calTimes', 'stats', 'titles', 'loadout', 'owned', 'toolLast'].forEach((k) => {
     if (!q[k] || typeof q[k] !== 'object') q[k] = qDefaults()[k];
   });
   qFill(q.calTimes, qDefaults().calTimes);
+  qFill(q.toolLast, qDefaults().toolLast);
+  if (!state.toolLinks || typeof state.toolLinks !== 'object') state.toolLinks = {};
   qFill(q.stats, qStatsDefault());
   qFill(q.titles, { unlocked: {}, equipped: 'recruit' });
   qFill(q.loadout, shopDefaultLoadout());
@@ -563,6 +567,7 @@ function renderQuest() {
   }
   c.appendChild(renderSessionPanel());
   c.appendChild(renderMissionPanel());
+  c.appendChild(renderToolsCard());
   const extras = renderSavedAndConvos();
   if (extras) c.appendChild(extras);
   if (artActive()) c.appendChild(renderShop());
@@ -813,7 +818,7 @@ function renderActionsCard() {
 
 // ---- motion preference (this device only; follows the phone's "reduce motion" setting by default) ----
 // bump together with CACHE in sw.js on every deploy
-const APP_BUILD = 74;
+const APP_BUILD = 75;
 const MOTION_KEY = 'holform-motion';
 function motionOff() {
   try {
@@ -1196,6 +1201,122 @@ function renderSavedAndConvos() {
     ]));
   });
   wrap.appendChild(el('div', { class: 'q-sub q-dim' }, 'Just a record for your Sunday review — no reply isn’t a failure.'));
+  return wrap;
+}
+
+// ---- business tools: your Lead Tracker and Post Log live on claude.ai; the app
+// opens them and awards XP when you say you used them (honor system) ----
+
+const TOOLS = {
+  leads: { name: 'Lead Tracker', xp: 15, max: 1, stat: 'leadDays', done: 'I updated my leads', cool: 'Leads are cooling off — a 5-minute check?' },
+  posts: { name: 'Post Log', xp: 20, max: 2, stat: 'postLogs', done: 'I logged a post', cool: 'No post logged lately — log one at its 7-day mark.' },
+};
+const TENX_XP = 75;
+const toolsUI = { err: '' };
+
+function toolClaimsToday(kind) {
+  const day = state.quest.xpAwarded[todayISO()] || {};
+  let n = 0;
+  for (let i = 1; i <= TOOLS[kind].max; i++) if (day['tool:' + kind + ':' + i]) n++;
+  return n;
+}
+
+function claimTool(kind) {
+  qEnsure();
+  const q = state.quest;
+  const t = TOOLS[kind];
+  const today = todayISO();
+  const n = toolClaimsToday(kind) + 1;
+  if (n > t.max) return;
+  awardXp(t.xp, 'tool:' + kind + ':' + n, today);
+  q.stats[t.stat] += 1;
+  q.toolLast[kind] = today;
+  qCheckTitles();
+  saveState();
+  render();
+}
+
+function claimTenX() {
+  qEnsure();
+  if (!awardXp(TENX_XP, 'tool:tenx', todayISO())) return;
+  state.quest.stats.tenX += 1;
+  qCheckTitles();
+  saveState();
+  render();
+}
+
+function daysSince(iso) {
+  if (!iso) return null;
+  return Math.round((new Date(todayISO() + 'T12:00:00') - new Date(iso + 'T12:00:00')) / 86400000);
+}
+
+function saveToolLink(kind, raw) {
+  const v = String(raw || '').trim();
+  if (!/^https:\/\/claude\.ai\/[^\s]+$/i.test(v)) {
+    toolsUI.err = 'Paste the full link that starts with https://claude.ai/';
+    render();
+    return;
+  }
+  toolsUI.err = '';
+  state.toolLinks[kind] = v;
+  saveState();
+  render();
+}
+
+function renderToolsCard() {
+  qEnsure();
+  const q = state.quest;
+  const wrap = el('div', { class: 'q-card q-tools' });
+  wrap.appendChild(qSection('Business tools', 'TRACK'));
+
+  Object.keys(TOOLS).forEach((kind) => {
+    const t = TOOLS[kind];
+    const link = state.toolLinks[kind];
+    const row = el('div', { class: 'q-tool' });
+    const ago = daysSince(q.toolLast[kind]);
+    const cooling = ago != null && ago >= 3;
+    const status = ago == null ? 'Not used yet' : ago === 0 ? 'Updated today' : ago === 1 ? 'Last updated yesterday' : `Last updated ${ago} days ago`;
+    row.appendChild(el('div', { class: 'q-tool-head' }, [
+      el('span', { class: 'q-tool-name' }, t.name),
+      el('span', { class: 'q-tool-status' + (cooling ? ' q-tool-cool' : '') }, status),
+    ]));
+
+    if (!link) {
+      const input = el('input', { type: 'url', class: 'q-tool-input', placeholder: `Paste your ${t.name} link`, inputmode: 'url' });
+      row.appendChild(el('div', { class: 'q-row q-row-tight' }, [
+        input,
+        el('button', { class: 'q-btn q-btn-small', onclick: () => saveToolLink(kind, input.value) }, 'Save link'),
+      ]));
+    } else {
+      const used = toolClaimsToday(kind);
+      const full = used >= t.max;
+      row.appendChild(el('div', { class: 'q-row q-row-tight' }, [
+        el('a', { class: 'q-btn q-btn-small', href: link, target: '_blank', rel: 'noopener' }, `Open ${t.name} ↗`),
+        el('button', {
+          class: 'q-btn q-btn-small q-btn-ghost', disabled: full ? 'disabled' : null,
+          onclick: () => claimTool(kind),
+        }, full ? '✓ Done today' : `${t.done} · +${t.xp} XP`),
+      ]));
+      if (kind === 'posts') {
+        const tenDone = (q.xpAwarded[todayISO()] || {})['tool:tenx'];
+        row.appendChild(el('div', { class: 'q-row q-row-tight' }, [
+          el('button', {
+            class: 'q-btn q-btn-small q-btn-ghost', disabled: tenDone ? 'disabled' : null,
+            onclick: claimTenX,
+          }, tenDone ? '✓ 10x hit recorded' : `🎯 A post hit 10x · +${TENX_XP} XP`),
+        ]));
+      }
+      if (cooling) row.appendChild(el('div', { class: 'q-sub q-dim' }, t.cool));
+      row.appendChild(el('button', {
+        class: 'q-tool-change',
+        onclick: () => { delete state.toolLinks[kind]; saveState(); render(); },
+      }, 'Change link'));
+    }
+    wrap.appendChild(row);
+  });
+
+  if (toolsUI.err) wrap.appendChild(el('div', { class: 'q-sub q-tool-err' }, toolsUI.err));
+  wrap.appendChild(el('div', { class: 'q-sub q-dim' }, 'Open a tracker, do your update, come back and tap the check-in. Your links are saved with your data, not in the public code.'));
   return wrap;
 }
 

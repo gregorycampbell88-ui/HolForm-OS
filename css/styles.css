@@ -1069,3 +1069,15 @@ div.art-ranger.art-power.art-superstill { animation: none; }
   22% { opacity: 1; transform: translateX(-50%) scale(1.02, 1.05); }
   100% { opacity: 0.9; transform: translateX(-50%) scale(1.05, 1.12); }
 }
+
+/* ---- business tools card (Lead Tracker, Post Log) ---- */
+.q-tool { padding: 10px 0; border-top: 1px solid var(--charcoal-2); }
+.q-tool:first-of-type { border-top: none; padding-top: 0; }
+.q-tool-head { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; }
+.q-tool-name { font-weight: 700; font-size: 0.9rem; }
+.q-tool-status { font-size: 0.74rem; color: var(--light-gray); }
+.q-tool-status.q-tool-cool { color: #e0b052; }
+.q-tool-input { flex: 1; min-width: 0; padding: 8px 10px; font: inherit; font-size: 0.85rem; color: var(--white); background: var(--charcoal-2); border: 1px solid var(--mid-gray); border-radius: 6px; }
+.q-tool-change { background: none; border: none; color: var(--mid-gray); font-size: 0.7rem; padding: 6px 0 0; cursor: pointer; text-decoration: underline; }
+.q-tool-err { color: #f2766c; }
+a.q-btn { text-decoration: none; display: inline-block; text-align: center; }

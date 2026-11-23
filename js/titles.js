@@ -67,6 +67,14 @@ const TITLES = [
   { id: 'dawn-patrol', name: 'Dawn Patrol', desc: '10 missions finished before 9 a.m.', test: (c) => c.s.morning >= 10 },
   { id: 'shape-shifter', name: 'Shape-Shifter', desc: 'Powered down and came back to action ten times.', test: (c) => c.s.morphs >= 10 },
 
+  // ---- business tools (lead tracker, post log) ----
+  { id: 'pipeline-keeper', name: 'Pipeline Keeper', desc: 'Kept your lead tracker up on 5 different days.', test: (c) => c.s.leadDays >= 5 },
+  { id: 'pipeline-master', name: 'Pipeline Master', desc: 'Kept your lead tracker up on 25 days.', test: (c) => c.s.leadDays >= 25 },
+  { id: 'on-air', name: 'On Air', desc: 'Logged your first post.', test: (c) => c.s.postLogs >= 1 },
+  { id: 'content-machine', name: 'Content Machine', desc: 'Logged 10 posts.', test: (c) => c.s.postLogs >= 10 },
+  { id: 'ten-x', name: 'Ten-X', desc: 'A post reached 10x your followers.', test: (c) => c.s.tenX >= 1 },
+  { id: 'viral-engine', name: 'Viral Engine', desc: 'Five posts hit 10x.', test: (c) => c.s.tenX >= 5 },
+
   // ---- Sunday ----
   { id: 'sunday-strategist', name: 'Sunday Strategist', desc: 'Wrote your first weekly reflection.', test: (c) => c.reflections >= 1 },
   { id: 'one-small-change', name: 'One Small Change', desc: 'Chose an adjustment for next week.', test: (c) => c.adjustments >= 1 },
