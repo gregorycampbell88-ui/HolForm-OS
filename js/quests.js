@@ -472,7 +472,7 @@ function startSession(minutes) {
 
 function getNextAnchor() {
   const weekday = new Date().getDay();
-  const groupKey = DAY_GROUP[state.season][weekday];
+  const groupKey = DAY_GROUP[weekday];
   const blocks = materializeChain(getEffectiveChain(groupKey));
   const nowMin = nowMinutes();
   const next = blocks.find((b) => b.category === 'anchor' && parseTimeToMinutes(b.start) > nowMin);
@@ -813,7 +813,7 @@ function renderActionsCard() {
 
 // ---- motion preference (this device only; follows the phone's "reduce motion" setting by default) ----
 // bump together with CACHE in sw.js on every deploy
-const APP_BUILD = 73;
+const APP_BUILD = 74;
 const MOTION_KEY = 'holform-motion';
 function motionOff() {
   try {

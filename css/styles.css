@@ -122,25 +122,6 @@ header {
   text-decoration: underline;
 }
 
-#season-toggle {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  background: var(--charcoal);
-  border: 1px solid var(--charcoal-2);
-  border-radius: 999px;
-  padding: 6px 12px;
-  cursor: pointer;
-  font-size: 0.72rem;
-  color: var(--light-gray);
-}
-
-#season-toggle .dot {
-  width: 9px; height: 9px; border-radius: 50%;
-  background: var(--green);
-}
-#season-toggle.season-driving .dot { background: var(--blue); }
-
 #date-label {
   font-size: 0.95rem;
   color: var(--mid-gray);

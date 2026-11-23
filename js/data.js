@@ -13,14 +13,13 @@ const CATEGORIES = {
 };
 
 // day groups: which schedule template applies to which weekday
-const DAY_GROUP = {
-  transition: { 1: 'transition-mwf', 3: 'transition-mwf', 5: 'transition-mwf', 2: 'transition-tth', 4: 'transition-tth', 6: 'saturday', 0: 'sunday' },
-  driving:    { 1: 'driving-mwf',    3: 'driving-mwf',    5: 'driving-mwf',    2: 'driving-tth',    4: 'driving-tth',    6: 'saturday', 0: 'sunday' },
-};
+const DAY_GROUP = { 1: 'transition-mwf', 3: 'transition-mwf', 5: 'transition-mwf', 2: 'transition-tth', 4: 'transition-tth', 6: 'saturday', 0: 'sunday' };
+// days saved while the old Driving Season switch existed point at these templates
+const LEGACY_GROUP = { 'driving-mwf': 'transition-mwf', 'driving-tth': 'transition-tth' };
 
 const DAY_NAMES = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
 
-// ---- Transition season (no driving job) ----
+// ---- Weekdays ----
 
 const TRANSITION_MWF = [
   { start: '5:45a',  end: '5:50a',  label: 'Wake', category: 'anchor' },
@@ -62,34 +61,7 @@ const TRANSITION_TTH = [
   { start: '10:00p', end: null,     label: 'Lights out', category: 'anchor' },
 ];
 
-// ---- Driving season (begins in a few weeks) ----
-
-const DRIVING_MWF = [
-  { start: '5:45a',  end: '6:30a',  label: 'Wake and time with God', category: 'anchor', accent: 'spirit' },
-  { start: '6:30a',  end: '6:45a',  label: 'Kids, preparation, and leave', category: 'anchor' },
-  { start: '7:00a',  end: '9:15a',  label: 'Driving job', category: 'anchor' },
-  { start: '9:25a',  end: '10:50a', label: 'Gym and shower', category: 'anchor', accent: 'spirit' },
-  { start: '10:50a', end: '11:10a', label: 'Meal and medication', category: 'anchor' },
-  { start: '11:10a', end: '1:10p',  label: 'Protected HolForm block or booked call', category: 'primary' },
-  { start: '1:30p',  end: '3:00p',  label: 'Driving job', category: 'anchor' },
-  { start: '3:00p',  end: null,     label: 'Family, walk, special time, calls, or flex', category: 'flex', accent: 'family' },
-];
-
-const DRIVING_TTH = [
-  { start: '4:45a',  end: '6:45a',  label: 'God, run, shower, breakfast, medication', category: 'anchor', accent: 'spirit' },
-  { start: '7:00a',  end: '9:15a',  label: 'Driving job', category: 'anchor' },
-  { start: '9:30a',  end: '1:10p',  label: 'Protected HolForm block or booked calls', category: 'primary' },
-  { start: '1:30p',  end: '3:00p',  label: 'Driving job', category: 'anchor' },
-  { start: '3:30p',  end: '3:45p',  label: 'Arrive home with kids', category: 'anchor', accent: 'family' },
-  { start: '4:15p',  end: '4:50p',  label: 'Family walk', category: 'anchor', accent: 'family' },
-  { start: '4:30p',  end: null,     label: 'Potential-client call (if booked) — kids safely set up', category: 'call' },
-  { start: '6:00p',  end: '7:15p',  label: 'Dinner, bath, bedtime', category: 'anchor', accent: 'family' },
-  { start: '7:30p',  end: null,     label: 'Potential-client call (if booked)', category: 'call' },
-  { start: '8:00p',  end: '8:20p',  label: 'Check-in with Ali (when no call interferes)', category: 'anchor', accent: 'family' },
-  { start: '10:00p', end: null,     label: 'Lights out', category: 'anchor' },
-];
-
-// ---- Weekend (same both seasons) ----
+// ---- Weekend ----
 
 const SATURDAY = [
   { start: '6:00a',  end: null,     label: 'Wake', category: 'anchor' },
@@ -115,44 +87,31 @@ const SUNDAY = [
 const SCHEDULES = {
   'transition-mwf': TRANSITION_MWF,
   'transition-tth': TRANSITION_TTH,
-  'driving-mwf': DRIVING_MWF,
-  'driving-tth': DRIVING_TTH,
   'saturday': SATURDAY,
   'sunday': SUNDAY,
 };
 
 const DAY_NOTES = {
-  transition: {
-    1: 'Individual time with daughter, 30–60 min, after special time begins (~15 min after home).',
-    3: 'Flex, walking, client calls. Small group at 7:00 p.m. two Wednesdays a month — Thursday wake shifts to 5:30 a.m. that week. Sauna preferred today.',
-    5: 'Individual time with son, 30–60 min, after special time begins (~15 min after home).',
-    2: 'Ali works until 8:00 p.m. — Greg has the kids.',
-    4: 'Ali works until 8:00 p.m. — Greg has the kids.',
-    6: 'Sauna preferred today.',
-  },
-  driving: {
-    1: 'Special time protected after Greg gets home.',
-    3: 'Preferred solo-walk and flex window this afternoon.',
-    5: 'Special time protected after Greg gets home.',
-    2: 'Strongest business day — enters the 9:30 block trained, medicated, and activated.',
-    4: 'Strongest business day — enters the 9:30 block trained, medicated, and activated.',
-  },
+  1: 'Individual time with daughter, 30–60 min, after special time begins (~15 min after home).',
+  3: 'Flex, walking, client calls. Small group at 7:00 p.m. two Wednesdays a month — Thursday wake shifts to 5:30 a.m. that week. Sauna preferred today.',
+  5: 'Individual time with son, 30–60 min, after special time begins (~15 min after home).',
+  2: 'Ali works until 8:00 p.m. — Greg has the kids.',
+  4: 'Ali works until 8:00 p.m. — Greg has the kids.',
+  6: 'Sauna preferred today.',
 };
 
-function getScheduleFor(season, weekday) {
-  const groupKey = DAY_GROUP[season][weekday];
+function getScheduleFor(weekday) {
+  const groupKey = DAY_GROUP[weekday];
   return { groupKey, blocks: SCHEDULES[groupKey] || [] };
 }
 
-function getDayNote(season, weekday) {
-  return (DAY_NOTES[season] && DAY_NOTES[season][weekday]) || null;
+function getDayNote(weekday) {
+  return DAY_NOTES[weekday] || null;
 }
 
 const GROUP_LABELS = {
-  'transition-mwf': 'Mon / Wed / Fri — Transition',
-  'transition-tth': 'Tue / Thu — Transition',
-  'driving-mwf': 'Mon / Wed / Fri — Driving',
-  'driving-tth': 'Tue / Thu — Driving',
+  'transition-mwf': 'Mon / Wed / Fri',
+  'transition-tth': 'Tue / Thu',
   saturday: 'Saturday',
   sunday: 'Sunday',
 };

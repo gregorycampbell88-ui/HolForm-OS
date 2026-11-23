@@ -5,7 +5,6 @@
 const STORAGE_KEY = 'holform-os-state-v1';
 
 const DEFAULT_STATE = {
-  season: 'transition', // 'transition' | 'driving'
   activeTab: 'today',   // 'today' | 'tasks' | 'dashboard'
   selectedDate: todayISO(),
   checks: {},        // { [dateISO]: { [blockIdx]: true } }
@@ -16,7 +15,7 @@ const DEFAULT_STATE = {
   weeklyTasks: {},     // { [weekKey]: [{id,text,checked,carriedCount}] }
   dailyTasks: {},      // { [dateISO]: [{id,text,checked,carriedCount}] }
   lastRolloverDate: null,
-  dayMeta: {},          // { [dateISO]: {groupKey, season} } — locks in which template a day used
+  dayMeta: {},          // { [dateISO]: {groupKey} } — locks in which template a day used
   weeklyReflections: {}, // { [weekKey]: string }
   scheduleOverrides: {}, // { [groupKey]: {anchorMinutes, items:[{id,label,category,accent,durationMin}]} }
   quest: {},             // character, XP, missions, gaming sessions — shape lives in js/quests.js
@@ -88,6 +87,7 @@ function inputTimeToMinutes(str) {
 }
 
 function getEffectiveChain(groupKey) {
+  groupKey = LEGACY_GROUP[groupKey] || groupKey;
   return state.scheduleOverrides[groupKey] || BASE_CHAINS[groupKey];
 }
 
@@ -197,10 +197,6 @@ function renderHeader() {
   const isToday = state.selectedDate === todayISO();
   document.getElementById('date-label').textContent =
     `${weekday}${isToday ? ' · Today' : ''} — ${d.toLocaleDateString(undefined, { month: 'short', day: 'numeric' })}`;
-
-  document.getElementById('season-toggle').classList.toggle('season-driving', state.season === 'driving');
-  document.getElementById('season-label').textContent =
-    state.season === 'transition' ? 'Transition (No Driving)' : 'Driving Season';
 }
 
 function renderToday() {
@@ -210,7 +206,7 @@ function renderToday() {
 
   const d = new Date(state.selectedDate + 'T12:00:00');
   const weekday = d.getDay();
-  const groupKey = DAY_GROUP[state.season][weekday];
+  const groupKey = DAY_GROUP[weekday];
 
   if (editingGroupKey === groupKey) {
     container.appendChild(renderScheduleEditor());
@@ -218,12 +214,12 @@ function renderToday() {
   }
 
   const blocks = materializeChain(getEffectiveChain(groupKey));
-  const note = getDayNote(state.season, weekday);
+  const note = getDayNote(weekday);
   const isToday = state.selectedDate === todayISO();
   const checksForDay = state.checks[state.selectedDate] || {};
 
   if (!state.dayMeta[state.selectedDate]) {
-    state.dayMeta[state.selectedDate] = { groupKey, season: state.season };
+    state.dayMeta[state.selectedDate] = { groupKey };
     saveState();
   }
   const isMinimum = !!state.minimumMode[state.selectedDate];
@@ -699,7 +695,7 @@ function computeWeekStats(weekDates) {
   const today = todayISO();
   const days = weekDates.map((dateISO) => {
     const weekday = new Date(dateISO + 'T12:00:00').getDay();
-    const meta = state.dayMeta[dateISO] || { groupKey: DAY_GROUP[state.season][weekday] };
+    const meta = state.dayMeta[dateISO] || { groupKey: DAY_GROUP[weekday] };
     const blocks = materializeChain(getEffectiveChain(meta.groupKey));
     const checksForDay = state.checks[dateISO] || {};
     const total = blocks.length;
@@ -943,11 +939,6 @@ function updateTimerDisplay() {
 // ---------- init ----------
 
 function init() {
-  document.getElementById('season-toggle').addEventListener('click', () => {
-    state.season = state.season === 'transition' ? 'driving' : 'transition';
-    saveState();
-    render();
-  });
   document.querySelectorAll('.tab-btn').forEach(btn => {
     btn.addEventListener('click', () => {
       state.activeTab = btn.dataset.tab;

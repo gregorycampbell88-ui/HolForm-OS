@@ -46,7 +46,7 @@ few clicks.
      appId: "1:123456789:web:abc123",
    };
    ```
-5. Save the file and reload the app. The badge next to the season toggle should
+5. Save the file and reload the app. The sync badge at the top right should
    now say **Sync: off** instead of **Sync: not set up**.
 
 ## 5. Sign in
