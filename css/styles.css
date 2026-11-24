@@ -381,9 +381,10 @@ main {
 .control-panel {
   display: flex;
   flex-direction: column;
-  gap: 16px;
-  border-top: 1px solid var(--charcoal-2);
-  padding-top: 16px;
+  gap: 14px;
+  border-bottom: 1px solid var(--charcoal-2);
+  padding-bottom: 16px;
+  margin-bottom: 16px;
 }
 
 .control-field label {
@@ -1081,3 +1082,32 @@ div.art-ranger.art-power.art-superstill { animation: none; }
 .q-tool-change { background: none; border: none; color: var(--mid-gray); font-size: 0.7rem; padding: 6px 0 0; cursor: pointer; text-decoration: underline; }
 .q-tool-err { color: #f2766c; }
 a.q-btn { text-decoration: none; display: inline-block; text-align: center; }
+
+/* ---- parking lot link, parked ideas (Tasks tab) ---- */
+.parked-link { margin-top: 8px; background: none; border: 1px dashed var(--green); color: var(--green); padding: 8px 12px; border-radius: 8px; font-size: 0.8rem; cursor: pointer; text-align: left; width: 100%; }
+.parked-section { margin-top: 28px; border-top: 1px solid var(--charcoal-2); padding-top: 18px; }
+.parked-card { background: var(--charcoal); border: 1px solid var(--charcoal-2); border-radius: 10px; padding: 10px; margin-bottom: 10px; display: flex; flex-direction: column; gap: 8px; }
+.parked-text { font-weight: 600; }
+.parked-note { resize: vertical; min-height: 64px; font-family: inherit; line-height: 1.4; }
+.parked-foot { display: flex; justify-content: space-between; align-items: center; gap: 8px; }
+.parked-date { font-size: 0.72rem; color: var(--mid-gray); }
+.parked-del { background: none; border: 1px solid var(--mid-gray); color: var(--light-gray); font-size: 0.74rem; padding: 6px 10px; border-radius: 6px; cursor: pointer; }
+.parked-del.armed { border-color: #f2766c; color: #f2766c; font-weight: 700; }
+
+/* ---- schedule editor: scope chips, anchor toggle, tags ---- */
+.edit-scope { display: flex; flex-wrap: wrap; gap: 6px; margin: 8px 0; }
+.edit-scope-btn { background: var(--charcoal); border: 1px solid var(--charcoal-2); color: var(--light-gray); padding: 8px 12px; border-radius: 999px; font-size: 0.8rem; cursor: pointer; }
+.edit-scope-btn.active { background: var(--green); border-color: var(--green); color: var(--black); font-weight: 700; }
+.schedule-editor .control-field { margin-bottom: 14px; }
+.edit-opts { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px; align-items: center; }
+.lock-btn { background: var(--charcoal-2); border: 1px solid var(--mid-gray); color: var(--light-gray); padding: 6px 10px; border-radius: 6px; font-size: 0.76rem; cursor: pointer; }
+.lock-btn.on { border-color: var(--green); color: var(--green); font-weight: 700; }
+.edit-block-row.edit-anchor { border-left: 3px solid var(--green); }
+.edit-type { background: var(--charcoal-2); border: 1px solid var(--mid-gray); color: var(--white); padding: 6px 8px; border-radius: 6px; font-size: 0.76rem; }
+.edit-tag { background: none; border: 1px solid var(--mid-gray); color: var(--light-gray); padding: 6px 10px; border-radius: 999px; font-size: 0.74rem; cursor: pointer; }
+.edit-tag.on { color: var(--black); font-weight: 700; }
+.edit-tag-family.on { background: #e8864a; border-color: #e8864a; }
+.edit-tag-spirit.on { background: #4aa3df; border-color: #4aa3df; }
+.edit-extra { margin-top: 18px; background: var(--charcoal); border: 1px solid var(--charcoal-2); border-radius: 10px; padding: 10px 12px; }
+.edit-extra summary { cursor: pointer; font-size: 0.86rem; font-weight: 600; }
+.edit-min-row { margin-top: 8px; align-items: center; }

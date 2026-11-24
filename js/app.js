@@ -21,6 +21,12 @@ const DEFAULT_STATE = {
   quest: {},             // character, XP, missions, gaming sessions — shape lives in js/quests.js
   weeklyAdjustments: {}, // { [weekKey]: string } — the one adjustment chosen at the Sunday review
   toolLinks: {},         // { leads, posts } — the claude.ai links to the Lead Tracker and Post Log (saved with your data, never in the repo)
+  parkedIdeas: [],       // [{id,text,note,date}] — the parking lot: ideas kept until you move them to your brain dump
+  dayOverrides: {},      // { [dateISO]: {anchorMinutes, items} } — a schedule just for one date
+  weekdayOverrides: {},  // { [0-6]: {anchorMinutes, items} } — a schedule for every Monday, every Tuesday, ...
+  dayNotes: {},          // { [dateISO]: string } — pinned note for one date ('' = no note)
+  weekdayNotes: {},      // { [0-6]: string } — pinned note for every Monday, ...
+  minimumItems: null,    // the Minimum-Viable Day checklist (null = the built-in list)
 };
 
 let state = loadState();
@@ -39,10 +45,36 @@ function loadState() {
     const raw = localStorage.getItem(STORAGE_KEY);
     if (!raw) return structuredClone(DEFAULT_STATE);
     const parsed = JSON.parse(raw);
-    return Object.assign(structuredClone(DEFAULT_STATE), parsed);
+    const s = Object.assign(structuredClone(DEFAULT_STATE), parsed);
+    s.selectedDate = todayISO();   // each launch starts on today, never on a stale day
+    return s;
   } catch (e) {
     return structuredClone(DEFAULT_STATE);
   }
+}
+
+// The day and tab you are looking at belong to THIS device. They are saved with
+// the rest of the data, but a synced copy from another device never changes them.
+function adoptRemoteState(remote) {
+  const keepDate = state.selectedDate;
+  const keepTab = state.activeTab;
+  state = Object.assign(structuredClone(DEFAULT_STATE), remote);
+  state.selectedDate = keepDate;
+  state.activeTab = keepTab;
+}
+
+// Parked ideas used to be kept per day; they now live in one list.
+function migrateParking() {
+  const old = state.parkingLot;
+  if (!old || typeof old !== 'object' || !Object.keys(old).length) return;
+  if (!Array.isArray(state.parkedIdeas)) state.parkedIdeas = [];
+  const have = new Set(state.parkedIdeas.map((p) => p.id));
+  Object.keys(old).sort().forEach((date) => {
+    (old[date] || []).forEach((item) => {
+      if (!have.has(item.id)) state.parkedIdeas.push({ id: item.id, text: item.text, note: '', date });
+    });
+  });
+  state.parkingLot = {};
 }
 
 function saveState() {
@@ -90,6 +122,53 @@ function inputTimeToMinutes(str) {
 function getEffectiveChain(groupKey) {
   groupKey = LEGACY_GROUP[groupKey] || groupKey;
   return state.scheduleOverrides[groupKey] || BASE_CHAINS[groupKey];
+}
+
+// ---- which schedule a given date uses ----
+// Layers, most specific first: this date only, then every <weekday>, then the
+// whole group (Mon/Wed/Fri ...), then the built-in default.
+
+function weekdayOf(dateISO) { return new Date(dateISO + 'T12:00:00').getDay(); }
+
+// the template a date follows (a day can be switched to another template)
+function templateFor(dateISO) {
+  const m = state.dayMeta[dateISO];
+  const g = m && (LEGACY_GROUP[m.groupKey] || m.groupKey);
+  return g && SCHEDULES[g] ? g : DAY_GROUP[weekdayOf(dateISO)];
+}
+
+function chainLayer(dateISO, scope) {
+  const wd = weekdayOf(dateISO);
+  const g = templateFor(dateISO);
+  const groupChain = state.scheduleOverrides[g] || BASE_CHAINS[g];
+  if (scope === 'group') return groupChain;
+  const weekdayChain = g === DAY_GROUP[wd] ? state.weekdayOverrides[wd] : null;
+  if (scope === 'weekday') return weekdayChain || groupChain;
+  return state.dayOverrides[dateISO] || weekdayChain || groupChain;
+}
+
+function chainFor(dateISO) { return chainLayer(dateISO, 'day'); }
+
+// pinned note: this date, else every <weekday>, else the built-in note
+function noteFor(dateISO, scope) {
+  const wd = weekdayOf(dateISO);
+  if (scope !== 'weekday' && state.dayNotes[dateISO] !== undefined) return state.dayNotes[dateISO];
+  if (state.weekdayNotes[wd] !== undefined) return state.weekdayNotes[wd];
+  return getDayNote(wd) || '';
+}
+
+const DEFAULT_MINIMUM_ITEMS = [
+  '30 minutes with God',
+  'Planned training or a 20-minute walk',
+  'One 45-minute money block — follow-ups and conversations',
+  'One 20-minute content action',
+  'One 15-minute household reset',
+  'Present for dinner and bedtime',
+  'Five-minute check-in with Ali',
+  'Go to bed on time',
+];
+function minimumItems() {
+  return Array.isArray(state.minimumItems) && state.minimumItems.length ? state.minimumItems : DEFAULT_MINIMUM_ITEMS;
 }
 
 function materializeChain(chain) {
@@ -205,25 +284,21 @@ function renderToday() {
   container.innerHTML = '';
   if (scheduleEditSortable) { scheduleEditSortable.destroy(); scheduleEditSortable = null; }
 
-  const d = new Date(state.selectedDate + 'T12:00:00');
-  const weekday = d.getDay();
-  const groupKey = DAY_GROUP[weekday];
-
-  if (editingGroupKey === groupKey) {
+  if (editing) {
     container.appendChild(renderScheduleEditor());
     return;
   }
 
-  const blocks = materializeChain(getEffectiveChain(groupKey));
-  const note = getDayNote(weekday);
-  const isToday = state.selectedDate === todayISO();
-  const checksForDay = state.checks[state.selectedDate] || {};
-
   if (!state.dayMeta[state.selectedDate]) {
-    state.dayMeta[state.selectedDate] = { groupKey };
+    state.dayMeta[state.selectedDate] = { groupKey: templateFor(state.selectedDate) };
     saveState();
   }
+  const blocks = materializeChain(chainFor(state.selectedDate));
+  const note = noteFor(state.selectedDate);
+  const isToday = state.selectedDate === todayISO();
+  const checksForDay = state.checks[state.selectedDate] || {};
   const isMinimum = !!state.minimumMode[state.selectedDate];
+  const customDay = !!state.dayOverrides[state.selectedDate];
 
   // date nav
   container.appendChild(el('div', { class: 'date-nav' }, [
@@ -231,6 +306,9 @@ function renderToday() {
     el('button', { class: 'nav-btn today-btn', onclick: () => { state.selectedDate = todayISO(); saveState(); render(); } }, 'Today'),
     el('button', { class: 'nav-btn', onclick: () => shiftDate(1) }, 'Next ›'),
   ]));
+
+  // finish line, phone mission, parking lot — the first thing you see
+  container.appendChild(renderControlPanel());
 
   if (note) {
     container.appendChild(el('div', { class: 'day-note' }, `📌 ${note}`));
@@ -258,7 +336,7 @@ function renderToday() {
         saveState(); render();
       }
     }, isMinimum ? '✓ Minimum-Viable Day' : 'Shrink to Minimum-Viable Day'),
-    el('button', { class: 'edit-schedule-btn', onclick: () => startEditingSchedule(groupKey) }, '✎ Edit Schedule'),
+    el('button', { class: 'edit-schedule-btn', onclick: () => startEditingSchedule() }, customDay ? '✎ Edit Schedule · custom day' : '✎ Edit Schedule'),
   ]));
 
   if (isToday && typeof renderToolsCard === 'function') container.appendChild(renderToolsCard());
@@ -272,21 +350,10 @@ function renderToday() {
     });
     container.appendChild(list);
   }
-
-  container.appendChild(renderControlPanel());
 }
 
 function renderMinimumList(checksForDay) {
-  const items = [
-    '30 minutes with God',
-    'Planned training or a 20-minute walk',
-    'One 45-minute money block — follow-ups and conversations',
-    'One 20-minute content action',
-    'One 15-minute household reset',
-    'Present for dinner and bedtime',
-    'Five-minute check-in with Ali',
-    'Go to bed on time',
-  ];
+  const items = minimumItems();
   const wrap = el('div', { class: 'block-list minimum-list' });
   items.forEach((text, idx) => {
     const key = 'min-' + idx;
@@ -347,39 +414,124 @@ function shiftDate(delta) {
 }
 
 // ---------- schedule editor ----------
+// Edits are saved as you type, into one "layer": just this date, every
+// <weekday>, or the whole group (Mon / Wed / Fri ...). See chainLayer().
 
-let editingGroupKey = null;
+let editing = false;
+let editDate = null;
+let editScope = 'group';   // 'day' | 'weekday' | 'group'
 let editDraft = null;
 let scheduleEditSortable = null;
 
-function startEditingSchedule(groupKey) {
-  const base = getEffectiveChain(groupKey);
+function groupWeekdays(group) {
+  return Object.keys(DAY_GROUP).filter((k) => DAY_GROUP[k] === group);
+}
+
+// "Every Wednesday" only makes sense when the group has more than one weekday
+// and this date is still following its own weekday's template.
+function scopeAvailable(scope) {
+  if (scope !== 'weekday') return true;
+  return templateFor(editDate) === DAY_GROUP[weekdayOf(editDate)] && groupWeekdays(templateFor(editDate)).length > 1;
+}
+
+function loadEditDraft() {
+  const base = chainLayer(editDate, editScope);
   editDraft = { anchorMinutes: base.anchorMinutes, items: base.items.map((i) => ({ ...i })) };
-  editingGroupKey = groupKey;
+}
+
+function startEditingSchedule() {
+  editDate = state.selectedDate;
+  const wd = weekdayOf(editDate);
+  if (state.dayOverrides[editDate]) editScope = 'day';
+  else if (state.weekdayOverrides[wd] && scopeAvailable('weekday')) editScope = 'weekday';
+  else editScope = 'group';
+  loadEditDraft();
+  editing = true;
   render();
 }
 
 function stopEditingSchedule() {
-  editingGroupKey = null;
+  editing = false;
   editDraft = null;
+  editDate = null;
   if (scheduleEditSortable) { scheduleEditSortable.destroy(); scheduleEditSortable = null; }
   render();
 }
 
 function saveEditDraft() {
-  state.scheduleOverrides[editingGroupKey] = {
-    anchorMinutes: editDraft.anchorMinutes,
-    items: editDraft.items.map((i) => ({ ...i })),
-  };
+  const data = { anchorMinutes: editDraft.anchorMinutes, items: editDraft.items.map((i) => ({ ...i })) };
+  if (editScope === 'day') state.dayOverrides[editDate] = data;
+  else if (editScope === 'weekday') state.weekdayOverrides[weekdayOf(editDate)] = data;
+  else state.scheduleOverrides[templateFor(editDate)] = data;
   saveState();
 }
 
 function renderScheduleEditor() {
+  const wd = weekdayOf(editDate);
+  const dayName = DAY_NAMES[wd];
+  const dateLabel = new Date(editDate + 'T12:00:00').toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
+  const group = templateFor(editDate);
+  const single = groupWeekdays(group).length <= 1;
+  const groupLabel = single ? `Every ${dayName}` : `All ${GROUP_LABELS[group]}`;
+  const scopes = [
+    { id: 'day', label: `Just ${dayName}, ${dateLabel}` },
+    { id: 'weekday', label: `Every ${dayName}` },
+    { id: 'group', label: groupLabel },
+  ].filter((s) => scopeAvailable(s.id));
+  if (!scopes.some((s) => s.id === editScope)) editScope = 'group';
+
   const wrap = el('div', { class: 'schedule-editor' });
+  const hint = {
+    day: 'Only this date changes. Every other ' + dayName + ' stays as it is.',
+    weekday: `Every ${dayName} changes (days you made custom keep their own schedule).`,
+    group: single ? `Every ${dayName} changes.` : `${GROUP_LABELS[group]} all change together.`,
+  }[editScope];
   wrap.appendChild(el('div', { class: 'editor-header' }, [
-    el('h3', {}, 'Editing: ' + (GROUP_LABELS[editingGroupKey] || editingGroupKey)),
-    el('p', { class: 'trend-sub' }, 'Drag ⠿ to reorder — each block keeps its length, times shift to match.'),
+    el('h3', {}, 'Edit the schedule'),
+    el('div', { class: 'edit-scope' }, scopes.map((s) => el('button', {
+      class: 'edit-scope-btn' + (s.id === editScope ? ' active' : ''),
+      onclick: () => { editScope = s.id; loadEditDraft(); render(); },
+    }, s.label))),
+    el('p', { class: 'trend-sub' }, hint + ' Drag ⠿ to reorder — each block keeps its length, times shift to match.'),
   ]));
+
+  // a single day can follow a different template (e.g. a Wednesday that runs like a Tue / Thu)
+  if (editScope === 'day') {
+    const sel = el('select', {
+      class: 'text-input',
+      onchange: (e) => {
+        state.dayMeta[editDate] = { groupKey: e.target.value };
+        delete state.dayOverrides[editDate];
+        if (editScope === 'weekday' && !scopeAvailable('weekday')) editScope = 'day';
+        loadEditDraft();
+        saveState();
+        render();
+      },
+    }, Object.keys(SCHEDULES).map((k) => el('option', { value: k, ...(k === group ? { selected: 'selected' } : {}) }, GROUP_LABELS[k] || k)));
+    wrap.appendChild(el('div', { class: 'control-field' }, [
+      el('label', {}, 'THIS DAY RUNS LIKE (switching starts it fresh from that template)'),
+      sel,
+    ]));
+  }
+
+  // pinned note — per date or per weekday (never for a whole multi-day group)
+  const noteScope = editScope === 'day' ? 'day' : (single || editScope === 'weekday' ? 'weekday' : null);
+  if (noteScope) {
+    wrap.appendChild(el('div', { class: 'control-field' }, [
+      el('label', {}, noteScope === 'day' ? 'PINNED NOTE FOR THIS DAY' : `PINNED NOTE FOR EVERY ${dayName.toUpperCase()}`),
+      el('input', {
+        type: 'text', class: 'text-input', placeholder: 'Optional — shows at the top of the day',
+        value: noteFor(editDate, noteScope),
+        oninput: (e) => {
+          if (noteScope === 'day') state.dayNotes[editDate] = e.target.value;
+          else state.weekdayNotes[wd] = e.target.value;
+          saveState();
+        },
+      }),
+    ]));
+  } else {
+    wrap.appendChild(el('p', { class: 'trend-sub' }, 'Pinned notes are per day — pick "Just this day" or "Every ' + dayName + '" above to change one.'));
+  }
 
   const list = el('ul', { class: 'edit-block-list' });
 
@@ -411,18 +563,59 @@ function renderScheduleEditor() {
     el('button', { class: 'lot-add-btn', onclick: addBlock }, 'Add'),
   ]));
 
+  wrap.appendChild(renderMinimumEditor());
+
+  const resetLabel = { day: 'Reset this day', weekday: `Reset every ${dayName}`, group: 'Reset to default' }[editScope];
   wrap.appendChild(el('div', { class: 'editor-footer' }, [
     el('button', {
       class: 'nav-btn', onclick: () => {
-        delete state.scheduleOverrides[editingGroupKey];
+        if (editScope === 'day') {
+          delete state.dayOverrides[editDate];
+          delete state.dayNotes[editDate];
+          state.dayMeta[editDate] = { groupKey: DAY_GROUP[wd] };   // back to its own weekday's template
+        }
+        else if (editScope === 'weekday') { delete state.weekdayOverrides[wd]; delete state.weekdayNotes[wd]; }
+        else delete state.scheduleOverrides[group];
         saveState();
-        stopEditingSchedule();
+        loadEditDraft();
+        render();
       }
-    }, 'Reset to Default'),
+    }, resetLabel),
     el('button', { class: 'nav-btn today-btn', onclick: stopEditingSchedule }, 'Done'),
   ]));
 
   return wrap;
+}
+
+// the Minimum-Viable Day checklist, editable
+function renderMinimumEditor() {
+  const box = el('details', { class: 'edit-extra' });
+  box.appendChild(el('summary', {}, 'Minimum-Viable Day checklist'));
+  const body = el('div', {});
+  box.appendChild(body);
+  const draw = () => {
+    body.innerHTML = '';
+    const items = minimumItems().slice();
+    const save = () => { state.minimumItems = items.slice(); saveState(); };
+    items.forEach((text, idx) => {
+      body.appendChild(el('div', { class: 'lot-input-row edit-min-row' }, [
+        el('input', { type: 'text', class: 'text-input', value: text, oninput: (e) => { items[idx] = e.target.value; save(); } }),
+        el('button', {
+          class: 'lot-remove', ...(items.length <= 1 ? { disabled: 'disabled' } : {}),
+          onclick: () => { items.splice(idx, 1); save(); draw(); },
+        }, '×'),
+      ]));
+    });
+    const addInput = el('input', { type: 'text', class: 'text-input', placeholder: 'New item, then Add' });
+    const add = () => { if (!addInput.value.trim()) return; items.push(addInput.value.trim()); save(); draw(); };
+    addInput.addEventListener('keydown', (e) => { if (e.key === 'Enter') { e.preventDefault(); add(); } });
+    body.appendChild(el('div', { class: 'lot-input-row' }, [addInput, el('button', { class: 'lot-add-btn', onclick: add }, 'Add')]));
+    body.appendChild(el('button', {
+      class: 'q-tool-change', onclick: () => { state.minimumItems = null; saveState(); draw(); },
+    }, 'Reset checklist to the original'));
+  };
+  draw();
+  return box;
 }
 
 function updateEditorTimeBadges(list) {
@@ -448,8 +641,9 @@ function renderEditorListInto(list) {
     const endMin = item.durationMin > 0 ? cursor + item.durationMin : null;
     cursor += item.durationMin;
     const timeStr = formatMinutes(startMin) + (endMin != null ? '–' + formatMinutes(endMin) : '');
+    const isAnchor = item.category === 'anchor';
 
-    const row = el('li', { class: 'edit-block-row' });
+    const row = el('li', { class: 'edit-block-row' + (isAnchor ? ' edit-anchor' : '') });
     row.appendChild(el('div', { class: 'edit-block-top' }, [
       el('span', { class: 'drag-handle' }, '⠿'),
       el('span', { class: 'edit-block-time' }, timeStr),
@@ -476,6 +670,25 @@ function renderEditorListInto(list) {
       }),
       el('span', { class: 'duration-unit' }, 'min'),
     ]));
+    row.appendChild(el('div', { class: 'edit-opts' }, [
+      el('button', {
+        class: 'lock-btn' + (isAnchor ? ' on' : ''),
+        onclick: () => {
+          if (isAnchor) item.category = item.prevCategory && item.prevCategory !== 'anchor' ? item.prevCategory : 'flex';
+          else { item.prevCategory = item.category; item.category = 'anchor'; }
+          saveEditDraft();
+          renderEditorListInto(list);
+        },
+      }, isAnchor ? '🔒 Locked anchor' : '🔓 Make it an anchor'),
+      el('select', {
+        class: 'edit-type',
+        onchange: (e) => { item.category = e.target.value; saveEditDraft(); renderEditorListInto(list); },
+      }, Object.keys(CATEGORIES).map((k) => el('option', { value: k, ...(k === item.category ? { selected: 'selected' } : {}) }, CATEGORIES[k].label))),
+      ...['family', 'spirit'].map((a) => el('button', {
+        class: 'edit-tag edit-tag-' + a + (item.accent === a ? ' on' : ''),
+        onclick: () => { item.accent = item.accent === a ? null : a; saveEditDraft(); renderEditorListInto(list); },
+      }, a === 'family' ? 'Family' : 'Spirit')),
+    ]));
     list.appendChild(row);
   });
 
@@ -492,11 +705,14 @@ function renderEditorListInto(list) {
   }
 }
 
+let pendingScroll = null;
+
+// finish line, phone mission and the parking lot's quick-add live at the top of Today
 function renderControlPanel() {
   const day = state.selectedDate;
   const finish = state.finishLine[day] || '';
   const phone = state.phoneMission[day] || '';
-  const lot = state.parkingLot[day] || [];
+  if (!Array.isArray(state.parkedIdeas)) state.parkedIdeas = [];
 
   const panel = el('div', { class: 'control-panel' });
 
@@ -522,8 +738,7 @@ function renderControlPanel() {
   const lotInput = el('input', { type: 'text', class: 'text-input', placeholder: 'Type an idea, then Park it' });
   const parkIt = () => {
     if (!lotInput.value.trim()) return;
-    if (!state.parkingLot[day]) state.parkingLot[day] = [];
-    state.parkingLot[day].push({ id: Date.now(), text: lotInput.value.trim() });
+    state.parkedIdeas.push({ id: Date.now(), text: lotInput.value.trim(), note: '', date: day });
     lotInput.value = '';
     if (window.Quest) Quest.onParked();
     saveState();
@@ -532,24 +747,17 @@ function renderControlPanel() {
   lotInput.addEventListener('keydown', (e) => {
     if (e.key === 'Enter' || e.keyCode === 13) { e.preventDefault(); parkIt(); }
   });
-  const lotRow = el('div', { class: 'lot-input-row' }, [
+  lotField.appendChild(el('div', { class: 'lot-input-row' }, [
     lotInput,
     el('button', { class: 'lot-add-btn', onclick: parkIt }, 'Park it'),
-  ]);
-  lotField.appendChild(lotRow);
-  const lotList = el('ul', { class: 'parking-list' });
-  lot.forEach(item => {
-    lotList.appendChild(el('li', {}, [
-      el('span', {}, item.text),
-      el('button', {
-        class: 'lot-remove', onclick: () => {
-          state.parkingLot[day] = state.parkingLot[day].filter(i => i.id !== item.id);
-          saveState(); render();
-        }
-      }, '×'),
-    ]));
-  });
-  lotField.appendChild(lotList);
+  ]));
+  const n = state.parkedIdeas.length;
+  if (n) {
+    lotField.appendChild(el('button', {
+      class: 'parked-link',
+      onclick: () => { pendingScroll = 'parked'; state.activeTab = 'tasks'; saveState(); render(); },
+    }, `💡 ${n} parked idea${n === 1 ? '' : 's'} — review, add details, or clear →`));
+  }
   panel.appendChild(lotField);
 
   return panel;
@@ -616,11 +824,17 @@ function renderTasks() {
   if (!state.weeklyTasks[weekKey]) state.weeklyTasks[weekKey] = [];
   if (!state.dailyTasks[dayKey]) state.dailyTasks[dayKey] = [];
 
+  const dayCol = renderTaskColumn("Today's Tasks", state.dailyTasks[dayKey]);
   const weekCol = renderTaskColumn('This Week', state.weeklyTasks[weekKey]);
-  const dayCol = renderTaskColumn('Today', state.dailyTasks[dayKey]);
 
-  const grid = el('div', { class: 'tasks-grid' }, [weekCol.node, dayCol.node]);
+  const grid = el('div', { class: 'tasks-grid' }, [dayCol.node, weekCol.node]);
   container.appendChild(grid);
+  container.appendChild(renderParkedIdeas());
+  if (pendingScroll === 'parked') {
+    pendingScroll = null;
+    const target = document.getElementById('parked-ideas');
+    if (target) target.scrollIntoView({ block: 'start' });
+  }
 
   if (window.Sortable) {
     weeklySortable = new Sortable(weekCol.listEl, {
@@ -632,6 +846,46 @@ function renderTasks() {
       onEnd: (evt) => reorderTasks(state.dailyTasks[dayKey], evt.oldIndex, evt.newIndex),
     });
   }
+}
+
+// Parked ideas wait here until you move them to your brain dump / ideas document.
+function renderParkedIdeas() {
+  if (!Array.isArray(state.parkedIdeas)) state.parkedIdeas = [];
+  const wrap = el('div', { class: 'parked-section', id: 'parked-ideas' });
+  wrap.appendChild(el('h3', { class: 'task-column-title' }, `💡 Parked ideas${state.parkedIdeas.length ? ' (' + state.parkedIdeas.length + ')' : ''}`));
+  wrap.appendChild(el('p', { class: 'trend-sub' }, 'Add details while you remember them. When an idea is in your brain dump / ideas document, delete it here.'));
+  if (!state.parkedIdeas.length) {
+    wrap.appendChild(el('p', { class: 'trend-sub' }, 'Nothing parked right now. Ideas you park on the Today tab land here.'));
+    return wrap;
+  }
+  state.parkedIdeas.slice().reverse().forEach((p) => {
+    const dateLabel = p.date ? new Date(p.date + 'T12:00:00').toLocaleDateString(undefined, { weekday: 'short', month: 'short', day: 'numeric' }) : '';
+    const del = el('button', { class: 'parked-del' }, 'In my brain dump — delete');
+    let armed = false;
+    let timer = null;
+    del.onclick = () => {
+      if (!armed) {
+        armed = true;
+        del.textContent = 'Tap again to delete';
+        del.classList.add('armed');
+        timer = setTimeout(() => { armed = false; del.textContent = 'In my brain dump — delete'; del.classList.remove('armed'); }, 4000);
+        return;
+      }
+      clearTimeout(timer);
+      state.parkedIdeas = state.parkedIdeas.filter((i) => i.id !== p.id);
+      saveState();
+      render();
+    };
+    wrap.appendChild(el('div', { class: 'parked-card' }, [
+      el('input', { type: 'text', class: 'text-input parked-text', value: p.text, oninput: (e) => { p.text = e.target.value; saveState(); } }),
+      el('textarea', {
+        class: 'text-input parked-note', rows: '3', placeholder: 'Add details so future-you remembers what this was…',
+        oninput: (e) => { p.note = e.target.value; saveState(); },
+      }, p.note || ''),
+      el('div', { class: 'parked-foot' }, [el('span', { class: 'parked-date' }, dateLabel ? 'Parked ' + dateLabel : ''), del]),
+    ]));
+  });
+  return wrap;
 }
 
 function reorderTasks(list, oldIndex, newIndex) {
@@ -697,9 +951,7 @@ let trendsWeekKey = null;
 function computeWeekStats(weekDates) {
   const today = todayISO();
   const days = weekDates.map((dateISO) => {
-    const weekday = new Date(dateISO + 'T12:00:00').getDay();
-    const meta = state.dayMeta[dateISO] || { groupKey: DAY_GROUP[weekday] };
-    const blocks = materializeChain(getEffectiveChain(meta.groupKey));
+    const blocks = materializeChain(chainFor(dateISO));
     const checksForDay = state.checks[dateISO] || {};
     const total = blocks.length;
     const checkedCount = blocks.reduce((n, b) => n + (checksForDay[b.id] ? 1 : 0), 0);
@@ -954,14 +1206,36 @@ function init() {
   }
   if (window.HolformSync) window.HolformSync.init(onRemoteState);
   if (window.Quest) Quest.ensure();
+  migrateParking();
   rolloverDailyTasks();
   applyHashTab();
   window.addEventListener('hashchange', () => { applyHashTab(); render(); });
   render();
   if (window.Quest) Quest.init();
-  setInterval(() => {
+
+  // When a new day starts (or the app wakes up on a new day) jump to today.
+  let lastToday = todayISO();
+  const checkNewDay = () => {
+    const now = todayISO();
+    if (now === lastToday) return false;
+    if (state.selectedDate === lastToday) state.selectedDate = now;
+    lastToday = now;
     rolloverDailyTasks();
-    if (state.activeTab === 'today' || state.activeTab === 'tasks') render();
+    saveState();
+    render();
+    return true;
+  };
+  document.addEventListener('visibilitychange', () => { if (!document.hidden) checkNewDay(); });
+  window.addEventListener('pageshow', checkNewDay);
+  window.addEventListener('focus', checkNewDay);
+
+  setInterval(() => {
+    if (checkNewDay()) return;
+    rolloverDailyTasks();
+    // don't rebuild the page while you are typing in it
+    const ae = document.activeElement;
+    const typing = ae && /^(INPUT|TEXTAREA|SELECT)$/.test(ae.tagName) && ae.closest('#view-today, #view-tasks');
+    if (!typing && (state.activeTab === 'today' || state.activeTab === 'tasks')) render();
   }, 60000);
 }
 
@@ -975,8 +1249,9 @@ function applyHashTab() {
 }
 
 function onRemoteState(remote) {
-  state = Object.assign(structuredClone(DEFAULT_STATE), remote);
+  adoptRemoteState(remote);
   if (window.Quest) Quest.ensure();
+  migrateParking();
   localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
   rolloverDailyTasks();
   render();

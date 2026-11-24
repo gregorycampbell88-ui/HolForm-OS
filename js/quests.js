@@ -475,9 +475,7 @@ function startSession(minutes) {
 }
 
 function getNextAnchor() {
-  const weekday = new Date().getDay();
-  const groupKey = DAY_GROUP[weekday];
-  const blocks = materializeChain(getEffectiveChain(groupKey));
+  const blocks = materializeChain(chainFor(todayISO()));
   const nowMin = nowMinutes();
   const next = blocks.find((b) => b.category === 'anchor' && parseTimeToMinutes(b.start) > nowMin);
   return next ? `${next.start.toUpperCase()} · ${next.label}` : 'No more anchors today — you’re free.';
@@ -818,7 +816,7 @@ function renderActionsCard() {
 
 // ---- motion preference (this device only; follows the phone's "reduce motion" setting by default) ----
 // bump together with CACHE in sw.js on every deploy
-const APP_BUILD = 75;
+const APP_BUILD = 76;
 const MOTION_KEY = 'holform-motion';
 function motionOff() {
   try {
